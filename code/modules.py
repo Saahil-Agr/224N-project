@@ -19,6 +19,30 @@ from tensorflow.python.ops.rnn_cell import DropoutWrapper
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import rnn_cell
 
+class CNNEmbedding(object):
+    """
+    Implementation of 'Character level' embedding from
+    Yoon Kim Convolutional Neural Networks for Sentence Classification, 2014
+    Intention is to implement with pretrain GLOVE embeddings
+    """
+    def __init__(self, window_size,featuremap_size, keep_prob,l2_max):
+        """
+        Initialize hyper-parameters
+        :param: window_size: [int] List of window sizes
+        :param: featuremap_size: int number of feature maps per window
+        :param: keep_prob: dropout parameter
+        :param: l2_max: l2 constraint, no effect if 0
+        """
+        self.window_size = window_size
+        self.featuremap_size = featuremap_size
+        self.keep_prob = keep_prob
+        self. l2_max = l2_max
+
+    def build_graph(self,inputs):
+        """
+        :param: inputs: Tensor shape (batch_size, embedding_length)
+        :return: outputs:  Tensor shape (batch_size, embedding_length)
+        """
 
 class RNNEncoder(object):
     """
