@@ -25,24 +25,38 @@ class CNNEmbedding(object):
     Yoon Kim Convolutional Neural Networks for Sentence Classification, 2014
     Intention is to implement with pretrain GLOVE embeddings
     """
-    def __init__(self, window_size,featuremap_size, keep_prob,l2_max):
+    def __init__(self, window_size,feature_map_size, embedding_size, keep_prob,l2_max):
         """
         Initialize hyper-parameters
         :param: window_size: [int] List of window sizes
-        :param: featuremap_size: int number of feature maps per window
+        :param: feature_map_size: [int] list of number of feature maps per window
+        :param: size of the initializer word embeddings
         :param: keep_prob: dropout parameter
         :param: l2_max: l2 constraint, no effect if 0
         """
         self.window_size = window_size
-        self.featuremap_size = featuremap_size
+        self.feature_map_size = feature_map_size
+        self.embedding_length = embedding_size
+        self.embedding_length = embedding_size
         self.keep_prob = keep_prob
         self. l2_max = l2_max
 
     def build_graph(self,inputs):
         """
-        :param: inputs: Tensor shape (batch_size, embedding_length)
-        :return: outputs:  Tensor shape (batch_size, embedding_length)
+        :param: inputs: Tensor shape (batch_size, context_length, embedding_length)
+        :return: outputs:  Tensor shape (batch_size, context_length, len(window_size)*feature_map_size)
         """
+        with vs.variable_scope("CNN_Embedding"):
+            for window,filter_num in zip(self.window_size,self.feature_map_size):
+                # verify that this meets all constraints
+                conv = tf.layers.conv1d(inputs, filter_num, self.embedding_length*window)
+                # pool size s.b. batch-window_size+1
+                pool = tf.layers.max_pooling1d(conv,batch_size-window+1,batch_size-window+1)
+                # we add the feature maps to our output tensor
+                outputs[:,:,] = pool
+                # still not implemented are dropout and weight norm constraint
+                # need to determine how the shapes of all this works first
+        return outputs
 
 class RNNEncoder(object):
     """
