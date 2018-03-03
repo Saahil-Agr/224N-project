@@ -54,8 +54,6 @@ class CNNEmbedding(object):
                 pool = tf.layers.max_pooling1d(conv,batch_size-window+1,batch_size-window+1)
                 # we add the feature maps to our output tensor
                 outputs[:,:,] = pool
-                # still not implemented are dropout and weight norm constraint
-                # need to determine how the shapes of all this works first
         return outputs
 
 class RNNEncoder(object):
