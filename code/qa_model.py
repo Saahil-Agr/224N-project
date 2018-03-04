@@ -30,7 +30,7 @@ from tensorflow.python.ops import embedding_ops
 from evaluate import exact_match_score, f1_score
 from data_batcher import get_batch_generator
 from pretty_print import print_example
-from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn
+from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff
 
 logging.basicConfig(level=logging.INFO)
 
@@ -76,7 +76,8 @@ class QAModel(object):
         # Define savers (for checkpointing) and summaries (for tensorboard)
         self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=FLAGS.keep)
         self.bestmodel_saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
-        self.summaries = tf.summary.merge_all()
+        self.sum
+        maries = tf.summary.merge_all()
 
 
     def add_placeholders(self):
@@ -135,6 +136,15 @@ class QAModel(object):
         question_hiddens = encoder.build_graph(self.qn_embs, self.qn_mask) # (batch_size, question_len, hidden_size*2)
 
         # Use context hidden states to attend to question hidden states
+        context_hiddens = tf.expand_dims(context_hiddens,2)
+        context_hiddens = tf.tile(context_hiddens,[1,1,self.FLAGS.question_len,1])
+        question_hiddens = tf.expand_dims(question_hiddens,1)
+        question_hiddens = tf.tile(question_hiddens,[1,self.FLAGS.context_len,1,1])
+        e_multiplied = tf.multiply(context_hiddens,question_hiddens)
+        S_intermediate = tf.concat([context_hiddens,question_hiddens,e_multiplied],2)
+        W_A = tf.get_variable("W_BiDaff",shape = [self.FLAGS.hidden_size*6,1],initializer=tf.contrib.layers.xavier_initializer())
+        S = tf.matmul(S_intermediate,W_A)
+
         attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
         _, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
 

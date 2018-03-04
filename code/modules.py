@@ -175,6 +175,42 @@ class BasicAttn(object):
 
             return attn_dist, output
 
+class BiDaff(object):
+    """
+    Bidirectional attention such that we compute the attention ditstribution between both key and values
+    """
+    def __init__(self, keep_prob, key_vec_size, value_vec_size):
+        """
+        Inputs:
+          keep_prob: tensor containing a single scalar that is the keep probability (for dropout)
+          key_vec_size: size of the key vectors. int
+          value_vec_size: size of the value vectors. int
+        """
+        self.keep_prob = keep_prob
+        self.key_vec_size = key_vec_size
+        self.value_vec_size = value_vec_size
+
+    def build_graph(self, values, values_mask, keys, keys_mask,S):
+        """
+        Inputs:
+        values:
+        values_mask:
+        keys:
+        Keys_mask:
+        S = Similarity matrix, tensor of dimension N*M
+        Output:
+        """
+        with vs.variable_scope("BiDaff"):
+            values_t = tf.transpose(values, perm=[0, 2, 1])  # (batch_size, value_vec_size, num_values)
+            attn_logits = tf.matmul(keys, values_t)  # shape (batch_size, num_keys, num_values)
+            attn_logits_mask = tf.expand_dims(values_mask, 1)  # shape (batch_size, 1, num_values)
+            _, attn_dist = masked_softmax(attn_logits, attn_logits_mask,2)  # shape (batch_size, num_keys, num_values).
+                                                                            #  take softmax over values
+            alpha =
+            alpha_mask = tf.expand_dims(values_mask, 1)  # shape (batch_size, 1, num_values)
+            _,attn_dist = masked_softmax(alpha,alpha_mask,2)
+
+    return
 
 def masked_softmax(logits, mask, dim):
     """
