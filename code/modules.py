@@ -35,25 +35,46 @@ class CNNEmbedding(object):
         :param: l2_max: l2 constraint, no effect if 0
         """
         self.window_size = window_size
-        self.feature_map_size = feature_map_size
-        self.embedding_length = embedding_size
-        self.embedding_length = embedding_size
+        # simple minimal type checking
+        if not isinstance(feature_map_size, list):
+            self.feature_map_size = [feature_map_size]
+        else:
+            self.feature_map_size = feature_map_size
+        if not isinstance(embedding_size,list):
+            self.embedding_length = [embedding_size]
+        else:
+            self.embedding_length = embedding_size
+        #TODO: verify these are necessary
         self.keep_prob = keep_prob
         self. l2_max = l2_max
 
-    def build_graph(self,inputs):
+    def build_graph(self,inputs,stride = 1):
         """
-        :param: inputs: Tensor shape (batch_size, context_length, embedding_length)
+        :param: inputs: Tensor shape (batch_size, context_length, char_tokenization_length)
         :return: outputs:  Tensor shape (batch_size, context_length, len(window_size)*feature_map_size)
+        Inspiration for a direct call to conv2d for 1d convolution from
+        talolard/basic_conv1d.py
         """
+        if stride >1:
+            raise NotImplementedError
+
         with vs.variable_scope("CNN_Embedding"):
+            #TODO: verify efficient output concatenation method
+            outputs = tf.get_variable('CharEmbedding',shape = [-1, context_length, Total_Output_Length])
+            inputSize = inputs.get_shape()[-1] # Get number of channels
+            # add dummy height [batch,1,context_len,embedding] so we can make direct calls
+            inputs = tf.expand_dims(inputs,axis = 1)
             for window,filter_num in zip(self.window_size,self.feature_map_size):
-                # verify that this meets all constraints
-                conv = tf.layers.conv1d(inputs, filter_num, self.embedding_length*window)
-                # pool size s.b. batch-window_size+1
-                pool = tf.layers.max_pooling1d(conv,batch_size-window+1,batch_size-window+1)
-                # we add the feature maps to our output tensor
-                outputs[:,:,] = pool
+                # output_size is number of feature maps for given window width
+                output_size = (inputSize-window+1)*filter_num
+                # create our temporal filter
+                filt = tf.get_variable("Temporal_Filter",shape=[1,window,inputSize,output_size])
+                # Perform our convolution
+                conv = tf.nn.conv2d(inputs, filt,strides = [1,1,stride,1],padding = 'SAME')
+                # Temporal pool
+                pool = tf.nn.max_pool(conv,[1,1,1,inputSize-window+1],[1,1,1,inputSize-window+1],padding = 'VALID')
+                # Append featuremaps together for output, remove dummy height
+                outputs[:,:,] = tf.squeeze(pool,axis=1)
         return outputs
 
 class RNNEncoder(object):
