@@ -76,8 +76,7 @@ class QAModel(object):
         # Define savers (for checkpointing) and summaries (for tensorboard)
         self.saver = tf.train.Saver(tf.global_variables(), max_to_keep=FLAGS.keep)
         self.bestmodel_saver = tf.train.Saver(tf.global_variables(), max_to_keep=1)
-        self.sum
-        maries = tf.summary.merge_all()
+        self.summaries = tf.summary.merge_all()
 
 
     def add_placeholders(self):
@@ -136,21 +135,37 @@ class QAModel(object):
         question_hiddens = encoder.build_graph(self.qn_embs, self.qn_mask) # (batch_size, question_len, hidden_size*2)
 
         # Use context hidden states to attend to question hidden states
-        context_hiddens = tf.expand_dims(context_hiddens,2)
-        context_hiddens = tf.tile(context_hiddens,[1,1,self.FLAGS.question_len,1])
-        question_hiddens = tf.expand_dims(question_hiddens,1)
-        question_hiddens = tf.tile(question_hiddens,[1,self.FLAGS.context_len,1,1])
-        e_multiplied = tf.multiply(context_hiddens,question_hiddens)
-        S_intermediate = tf.concat([context_hiddens,question_hiddens,e_multiplied],2)
-        W_A = tf.get_variable("W_BiDaff",shape = [self.FLAGS.hidden_size*6,1],initializer=tf.contrib.layers.xavier_initializer())
-        S = tf.matmul(S_intermediate,W_A)
+        context_hiddens_exp = tf.expand_dims(context_hiddens, 2)
+        context_hiddens_exp = tf.tile(context_hiddens_exp, [1, 1, self.FLAGS.question_len, 1])
+        question_hiddens_exp = tf.expand_dims(question_hiddens, 1)
+        question_hiddens_exp = tf.tile(question_hiddens_exp, [1, self.FLAGS.context_len, 1, 1])
+        print question_hiddens_exp.get_shape(), context_hiddens_exp.get_shape()
+        e_multiplied = tf.multiply(context_hiddens_exp, question_hiddens_exp)
+        S_intermediate = tf.concat([context_hiddens_exp, question_hiddens_exp, e_multiplied], 3)
+        print e_multiplied.get_shape(), S_intermediate.get_shape()
+        W_A = tf.get_variable("W_BiDaff", shape=[1,1,1,self.FLAGS.hidden_size * 6],
+                              initializer=tf.contrib.layers.xavier_initializer())
+        S = tf.multiply(S_intermediate, W_A)
+        S = tf.reduce_sum(S,axis = 3)
+        biAttn_layer = BiDaff(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
+        c2q,q2c = biAttn_layer.build_graph(question_hiddens,self.qn_mask,context_hiddens,self.context_mask,S)
+        print c2q.get_shape(), q2c.get_shape()
+        #q2c = tf.expand_dims(q2c, 1) # shape(batch_size,1,context_vec_size)
+        q2c = tf.tile(q2c, [1,self.FLAGS.context_len,1]) # shape(batch_size,context_vec_size,context_vec_size)
+        print q2c.get_shape()
+        c_c2q = tf.multiply(context_hiddens,c2q) #shape(batch_size,num_question,hidden_size*2)
+        c_q2c = tf.multiply(context_hiddens, q2c) #shape(batch_size,num_question,hidden_size*2)
+        print c_c2q.get_shape(), c_q2c.get_shape()
+        blended_reps_bi = tf.concat([context_hiddens, c2q, c_c2q,c_q2c],axis = 2)  #shape(batch_size,num_context,hidden_size*8)
 
+
+        ########################
         attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
         _, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
 
         # Concat attn_output to context_hiddens to get blended_reps
         blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
-
+        ########################
         # Apply fully connected layer to each blended representation
         # Note, blended_reps_final corresponds to b' in the handout
         # Note, tf.contrib.layers.fully_connected applies a ReLU non-linarity here by default

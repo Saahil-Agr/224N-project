@@ -197,20 +197,29 @@ class BiDaff(object):
         values_mask:
         keys:
         Keys_mask:
-        S = Similarity matrix, tensor of dimension N*M
+        S = Similarity matrix, tensor of dimension N*M (batch_size,num_keys,num_values)
         Output:
         """
         with vs.variable_scope("BiDaff"):
-            values_t = tf.transpose(values, perm=[0, 2, 1])  # (batch_size, value_vec_size, num_values)
-            attn_logits = tf.matmul(keys, values_t)  # shape (batch_size, num_keys, num_values)
-            attn_logits_mask = tf.expand_dims(values_mask, 1)  # shape (batch_size, 1, num_values)
-            _, attn_dist = masked_softmax(attn_logits, attn_logits_mask,2)  # shape (batch_size, num_keys, num_values).
-                                                                            #  take softmax over values
-            alpha =
-            alpha_mask = tf.expand_dims(values_mask, 1)  # shape (batch_size, 1, num_values)
-            _,attn_dist = masked_softmax(alpha,alpha_mask,2)
+           #values_t = tf.transpose(values, perm=[0, 2, 1])  # (batch_size, value_vec_size, num_values)
+           # attn_logits = tf.matmul(keys, values_t)  # shape (batch_size, num_keys, num_values)
+           # attn_logits_mask = tf.expand_dims(values_mask, 1)  # shape (batch_size, 1, num_values)
+           # _, attn_dist = masked_softmax(attn_logits, attn_logits_mask,2)  # shape (batch_size, num_keys, num_values).
 
-    return
+            alpha_mask = tf.expand_dims(values_mask, 1)  # shape (batch_size, 1, num_values)
+            _,attn_dist = masked_softmax(S,alpha_mask,2) # shape(batch_size,num_keys,num_values
+                                                         # softmax taken over values
+            a = tf.matmul(attn_dist,values) # context2query attention like in basic attention,
+                                            # shape(batch_size,num_keys,value_vec_size)
+            m = tf.reduce_max(S,axis = 2) # shape(batch_size,num_keys,)
+            #m_mask = tf.expand_dims(keys_mask,1) # shape(batch_size,1,num_keys,)
+            _,beta = masked_softmax(m,keys_mask,1) # shape(batch_size, num_keys)
+            beta = tf.expand_dims(beta,1)
+            c_attn = tf.matmul(beta,keys) #shape(batch_size,key_vec_size)
+            print S.get_shape(), m.get_shape(), beta.get_shape(), c_attn.get_shape()
+            a = tf.nn.dropout(a, self.keep_prob)
+            c_attn = tf.nn.dropout(c_attn, self.keep_prob)
+        return a,c_attn
 
 def masked_softmax(logits, mask, dim):
     """
