@@ -38,7 +38,8 @@ logging.basicConfig(level=logging.INFO)
 class QAModel(object):
     """Top-level Question Answering module"""
 
-    def __init__(self, FLAGS, id2word, word2id, emb_matrix):
+    #TODO generalize to hande preconfigured char_emb_matrix
+    def __init__(self, FLAGS, id2word, word2id, emb_matrix, id2char, char2id, char_emb_matrix=None):
         """
         Initializes the QA model.
 
@@ -52,6 +53,8 @@ class QAModel(object):
         self.FLAGS = FLAGS
         self.id2word = id2word
         self.word2id = word2id
+        self.id2char = id2char
+        self.char2id = char2id
 
         # Add all parts of the graph
         with tf.variable_scope("QAModel", initializer=tf.contrib.layers.variance_scaling_initializer(factor=1.0, uniform=True)):
@@ -90,7 +93,7 @@ class QAModel(object):
         self.char_context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len, self.FLAGS.word_len])
         self.context_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
         self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.qn_context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len, self.FLAGS.word_len])
+        self.char_qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len, self.FLAGS.word_len])
         self.qn_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
         self.ans_span = tf.placeholder(tf.int32, shape=[None, 2])
 
@@ -132,11 +135,12 @@ class QAModel(object):
         # Create character level embeddings
         #TODO hand in actual arguments
         #Context
-        char_embedder = CNNEmbedding(window_size,feature_map_size, embedding_size, keep_prob,l2_max)
-        char_context_emb = char_embedder.build_graph(self.char_context_ids,self.char_mask)
+        char_embedder = CNNEmbedding(self.FLAGS.char_window_size,self.FLAGS.char_filter_num,
+                                     self.FLAGS.char_embedding_size, 0,0)
+        char_context_emb = char_embedder.build_graph(self.char_context_ids,self.context_mask)
         self.full_context_embs = tf.concat([self.context_embs,char_context_emb],axis=2)
         #question
-        char_qn_emb = char_embedder.build_graph(self.qn_context_ids, self.qn_mask)
+        char_qn_emb = char_embedder.build_graph(self.char_qn_ids, self.qn_mask)
         self.full_qn_embs = tf.concat([self.qn_embs, char_qn_emb], axis=2)
         #TODO trace self.context_embs through the code to see where we need to update this
 
@@ -226,9 +230,10 @@ class QAModel(object):
         # Match up our input data with the placeholders
         input_feed = {}
         input_feed[self.context_ids] = batch.context_ids
-        input_feed[self.char_context_ids] = batch.
+        input_feed[self.char_context_ids] = batch.char_context_ids
         input_feed[self.context_mask] = batch.context_mask
         input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.char_qn_ids] = batch.char_qn_ids
         input_feed[self.qn_mask] = batch.qn_mask
         input_feed[self.ans_span] = batch.ans_span
         input_feed[self.keep_prob] = 1.0 - self.FLAGS.dropout # apply dropout
@@ -259,8 +264,10 @@ class QAModel(object):
 
         input_feed = {}
         input_feed[self.context_ids] = batch.context_ids
+        input_feed[self.char_context_ids] = batch.char_context_ids
         input_feed[self.context_mask] = batch.context_mask
         input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.char_qn_ids] = batch.char_qn_ids
         input_feed[self.qn_mask] = batch.qn_mask
         input_feed[self.ans_span] = batch.ans_span
         # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
@@ -285,8 +292,10 @@ class QAModel(object):
         """
         input_feed = {}
         input_feed[self.context_ids] = batch.context_ids
+        input_feed[self.char_context_ids] = batch.char_context_ids
         input_feed[self.context_mask] = batch.context_mask
         input_feed[self.qn_ids] = batch.qn_ids
+        input_feed[self.char_qn_ids] = batch.char_qn_ids
         input_feed[self.qn_mask] = batch.qn_mask
         # note you don't supply keep_prob here, so it will default to 1 i.e. no dropout
 

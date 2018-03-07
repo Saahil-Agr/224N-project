@@ -48,9 +48,11 @@ class CNNEmbedding(object):
         self.keep_prob = keep_prob
         self. l2_max = l2_max
 
-    def build_graph(self,inputs,stride = 1):
+    def build_graph(self,inputs, mask, stride = 1):
         """
         :param: inputs: Tensor shape (batch_size, context_length, char_tokenization_length)
+        :param: mask: identifies which characters are valid
+        :param: stride: length for convolution just in case we want that accessible later
         :return: outputs:  Tensor shape (batch_size, context_length, len(window_size)*feature_map_size)
         Inspiration for a direct call to conv2d for 1d convolution from
         talolard/basic_conv1d.py
@@ -60,11 +62,14 @@ class CNNEmbedding(object):
 
         with vs.variable_scope("CNN_Embedding"):
             #TODO: verify efficient output concatenation method
-            outputs = tf.get_variable('CharEmbedding',shape = [-1, context_length, Total_Output_Length])
+            Q = tf.get_variable('Q', shape = )
+            context_length = inputs.get_shape()[-2] # Get context length
+            #outputs = tf.get_variable('CharEmbedding',shape = [-1, context_length, Total_Output_Length])
             inputSize = inputs.get_shape()[-1] # Get number of channels
             # add dummy height [batch,1,context_len,embedding] so we can make direct calls
             inputs = tf.expand_dims(inputs,axis = 1)
             for window,filter_num in zip(self.window_size,self.feature_map_size):
+                #TODO our actual window is over # chars and chars have length embedding size, address this
                 # output_size is number of feature maps for given window width
                 output_size = (inputSize-window+1)*filter_num
                 # create our temporal filter
@@ -74,8 +79,8 @@ class CNNEmbedding(object):
                 # Temporal pool
                 pool = tf.nn.max_pool(conv,[1,1,1,inputSize-window+1],[1,1,1,inputSize-window+1],padding = 'VALID')
                 # Append featuremaps together for output, remove dummy height
-                outputs[:,:,] = tf.squeeze(pool,axis=1)
-        return outputs
+                pool = tf.squeeze(pool,axis=1)
+        return pool
 
 class RNNEncoder(object):
     """

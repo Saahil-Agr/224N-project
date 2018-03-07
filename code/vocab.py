@@ -26,7 +26,10 @@ _UNK = b"<unk>"
 _START_VOCAB = [_PAD, _UNK]
 PAD_ID = 0
 UNK_ID = 1
-
+#TODO create this for char embeddings
+#Per bidaf we have a start word char,end word char and unknown char
+#_CHAR_START_VOCAB = [_START,_END, _UNKC]
+_CHAR_START_VOCAB = []
 
 def get_glove(glove_path, glove_dim):
     """Reads from original GloVe .txt file and returns embedding matrix and
@@ -82,3 +85,56 @@ def get_glove(glove_path, glove_dim):
     assert idx == final_vocab_size
 
     return emb_matrix, word2id, id2word
+
+def get_char(char_path, char_dim=0, char_embedding = False):
+    """
+    :param char_path: path to txt file with characters as the first entry and potentially vector encodings for the char
+    :param char_dim: dimensionality of the embedding if included
+    :param char_embedding: FLAG to let us know to search for embedding or not
+    :return: char2id, id2char, char_emb_matrix with last entry none if char_embedding is false
+    """
+
+    print "Loading Character vectors from file: %s" % char_path
+    vocab_size = 62 #current number of characters we are supporting
+    #TODO evaluate this design decision
+    #vocab_size = int(4e5) # this is the vocab size of the corpus we've downloaded
+
+    if char_embedding is True:
+        char_emb_matrix = np.zeros((vocab_size + len(_START_VOCAB), glove_dim))
+    else:
+        char_emb_matrix = None
+    char2id = {}
+    id2char = {}
+
+    random_init = True
+    # randomly initialize the special tokens
+    if random_init and char_embedding:
+        emb_matrix[:len(_START_VOCAB), :] = np.random.randn(len(_START_VOCAB), glove_dim)
+
+    # put start tokens in the dictionaries
+    idx = 0
+    for char in _CHAR_START_VOCAB:
+        char2id[char] = idx
+        id2char[idx] = char
+        idx += 1
+
+    # go through char vecs
+    with open(char_path, 'r') as fh:
+        for line in tqdm(fh, total=vocab_size):
+            line = line.lstrip().rstrip().split(" ")
+            char = line[0]
+            if char_embedding is True:
+                vector = list(map(float, line[1:]))
+                if (char_dim != len(vector)):
+                    raise Exception("You set --char_path=%s but --embedding_size=%i. If you set --char_path yourself then make sure that --embedding_size matches!" % (char_path, char_dim))
+                emb_matrix[idx, :] = vector
+            char2id[char] = idx
+            id2char[idx] = char
+            idx += 1
+
+    final_vocab_size = vocab_size + len(_CHAR_START_VOCAB)
+    assert len(char2id) == final_vocab_size
+    assert len(id2char) == final_vocab_size
+    assert idx == final_vocab_size
+
+    return char_emb_matrix, char2id, id2char
