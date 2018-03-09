@@ -136,10 +136,10 @@ class QAModel(object):
 
         # Use context hidden states to attend to question hidden states
         context_hiddens_exp = tf.expand_dims(context_hiddens, 2) # (batch_size, context_len, 1, hidden_size*2)
-        context_hiddens_exp = tf.tile(context_hiddens_exp, [1, 1, self.FLAGS.question_len, 1]) #(batch_size, context_len
+        #context_hiddens_exp = tf.tile(context_hiddens_exp, [1, 1, self.FLAGS.question_len, 1]) #(batch_size, context_len
                                                                                         # ,question_len , hidden_size*2)
         question_hiddens_exp = tf.expand_dims(question_hiddens, 1) #(batch_size, 1, question_len, hidden_size*2)
-        question_hiddens_exp = tf.tile(question_hiddens_exp, [1, self.FLAGS.context_len, 1, 1]) #(batch_size, context_len,
+        #question_hiddens_exp = tf.tile(question_hiddens_exp, [1, self.FLAGS.context_len, 1, 1]) #(batch_size, context_len,
                                                                                                 # question_len, hidden_size*2)
         #print question_hiddens_exp.get_shape(), context_hiddens_exp.get_shape()
         e_multiplied = tf.multiply(context_hiddens_exp, question_hiddens_exp)
