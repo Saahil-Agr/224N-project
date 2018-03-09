@@ -136,7 +136,7 @@ class QAModel(object):
         # Create character level embeddings
         #Context
         # raise vocab size, 64 to accessible varibale
-        Q = tf.get_variable('Q', shape=[85+1+1+1+1, self.FLAGS.char_embedding_size],
+        Q = tf.get_variable('Q', shape=[87+1+1+1+1, self.FLAGS.char_embedding_size],
                             initializer = tf.contrib.layers.xavier_initializer())
         char_embedder = CNNEmbedding(self.FLAGS.char_window_size,self.FLAGS.char_filter_num,
                                      self.FLAGS.char_embedding_size, self.FLAGS.word_len, 1,1)

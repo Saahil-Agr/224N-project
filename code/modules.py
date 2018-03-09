@@ -46,7 +46,7 @@ class CNNEmbedding(object):
             self.window_size = window_size
         self.word_length = word_length
         #TODO raise this to init call
-        self.char_vocab_size = 62
+        self.char_vocab_size = 87
         #TODO: verify these are necessary
         self.keep_prob = keep_prob
         self. l2_max = l2_max
