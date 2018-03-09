@@ -30,7 +30,7 @@ from tensorflow.python.ops import embedding_ops
 from evaluate import exact_match_score, f1_score
 from data_batcher import get_batch_generator
 from pretty_print import print_example
-from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff
+from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff, BiLSTM,BiLSTM2
 
 logging.basicConfig(level=logging.INFO)
 
@@ -135,53 +135,77 @@ class QAModel(object):
         question_hiddens = encoder.build_graph(self.qn_embs, self.qn_mask) # (batch_size, question_len, hidden_size*2)
 
         # Use context hidden states to attend to question hidden states
-        context_hiddens_exp = tf.expand_dims(context_hiddens, 2)
-        context_hiddens_exp = tf.tile(context_hiddens_exp, [1, 1, self.FLAGS.question_len, 1])
-        question_hiddens_exp = tf.expand_dims(question_hiddens, 1)
-        question_hiddens_exp = tf.tile(question_hiddens_exp, [1, self.FLAGS.context_len, 1, 1])
-        print question_hiddens_exp.get_shape(), context_hiddens_exp.get_shape()
+        context_hiddens_exp = tf.expand_dims(context_hiddens, 2) # (batch_size, context_len, 1, hidden_size*2)
+        context_hiddens_exp = tf.tile(context_hiddens_exp, [1, 1, self.FLAGS.question_len, 1]) #(batch_size, context_len
+                                                                                        # ,question_len , hidden_size*2)
+        question_hiddens_exp = tf.expand_dims(question_hiddens, 1) #(batch_size, 1, question_len, hidden_size*2)
+        question_hiddens_exp = tf.tile(question_hiddens_exp, [1, self.FLAGS.context_len, 1, 1]) #(batch_size, context_len,
+                                                                                                # question_len, hidden_size*2)
+        #print question_hiddens_exp.get_shape(), context_hiddens_exp.get_shape()
         e_multiplied = tf.multiply(context_hiddens_exp, question_hiddens_exp)
-        S_intermediate = tf.concat([context_hiddens_exp, question_hiddens_exp, e_multiplied], 3)
-        print e_multiplied.get_shape(), S_intermediate.get_shape()
+       # S_intermediate = tf.concat([context_hiddens_exp, question_hiddens_exp, e_multiplied], 3)
+        #print e_multiplied.get_shape(), S_intermediate.get_shape()
         W_A = tf.get_variable("W_BiDaff", shape=[1,1,1,self.FLAGS.hidden_size * 6],
                               initializer=tf.contrib.layers.xavier_initializer())
-        S = tf.multiply(S_intermediate, W_A)
-        S = tf.reduce_sum(S,axis = 3)
+        #S = tf.multiply(S_intermediate, W_A)
+        q1 = tf.reduce_sum(tf.multiply(context_hiddens_exp,W_A[0,0,0,0:self.FLAGS.hidden_size * 2]),axis=3)
+        c1 = tf.reduce_sum(tf.multiply(question_hiddens_exp, W_A[0, 0, 0, self.FLAGS.hidden_size * 2:
+                                                                          self.FLAGS.hidden_size * 4]), axis=3)
+        q1_c1 = tf.reduce_sum(tf.multiply(e_multiplied, W_A[0, 0, 0, self.FLAGS.hidden_size * 4:
+                                                                          self.FLAGS.hidden_size * 6]), axis=3)
+        #S = tf.reduce_sum(S,axis = 3)
+        #print "q shape",q1.get_shape(), "c shape", c1.get_shape(), "e", q1_c1.get_shape()
+        S = q1+c1+q1_c1
+        #print "S", S.get_shape()
         biAttn_layer = BiDaff(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
         c2q,q2c = biAttn_layer.build_graph(question_hiddens,self.qn_mask,context_hiddens,self.context_mask,S)
-        print c2q.get_shape(), q2c.get_shape()
+        #print c2q.get_shape(), q2c.get_shape()
         #q2c = tf.expand_dims(q2c, 1) # shape(batch_size,1,context_vec_size)
         q2c = tf.tile(q2c, [1,self.FLAGS.context_len,1]) # shape(batch_size,context_vec_size,context_vec_size)
-        print q2c.get_shape()
+        #print q2c.get_shape()
         c_c2q = tf.multiply(context_hiddens,c2q) #shape(batch_size,num_question,hidden_size*2)
         c_q2c = tf.multiply(context_hiddens, q2c) #shape(batch_size,num_question,hidden_size*2)
-        print c_c2q.get_shape(), c_q2c.get_shape()
+        #print c_c2q.get_shape(), c_q2c.get_shape()
         blended_reps_bi = tf.concat([context_hiddens, c2q, c_c2q,c_q2c],axis = 2)  #shape(batch_size,num_context,hidden_size*8)
 
 
-        ########################
-        attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
-        _, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
-
-        # Concat attn_output to context_hiddens to get blended_reps
-        blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
-        ########################
+        # ########################
+        # attn_layer = BasicAttn(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
+        # _, attn_output = attn_layer.build_graph(question_hiddens, self.qn_mask, context_hiddens) # attn_output is shape (batch_size, context_len, hidden_size*2)
+        #
+        # # Concat attn_output to context_hiddens to get blended_reps
+        # blended_reps = tf.concat([context_hiddens, attn_output], axis=2) # (batch_size, context_len, hidden_size*4)
+        # ########################
         # Apply fully connected layer to each blended representation
         # Note, blended_reps_final corresponds to b' in the handout
         # Note, tf.contrib.layers.fully_connected applies a ReLU non-linarity here by default
-        blended_reps_final = tf.contrib.layers.fully_connected(blended_reps, num_outputs=self.FLAGS.hidden_size) # blended_reps_final is shape (batch_size, context_len, hidden_size)
+
+        modelling = BiLSTM(self.FLAGS.hidden_size,self.keep_prob)
+        modelling2 = BiLSTM2(self.FLAGS.hidden_size,self.keep_prob)
+        blended_reps_int = modelling.build_graph(blended_reps_bi,self.context_mask) #shape(batch_size,context_len,2*hidden_size)
+       #print "blended vector after LSTM", blended_reps_int.get_shape(), "Blended vector after BiDaff", blended_reps_bi.get_shape()
+        blended_reps_final = modelling2.build_graph(blended_reps_int,self.context_mask) #shape(batch_size,context_len,2*hidden_size)
+        blended_reps_start = tf.concat([blended_reps_bi,blended_reps_final],axis = 2)
+        blended_reps_final2 = modelling2.build_graph(blended_reps_final,self.context_mask)
+        # shape(batch_size,context_len,2*hidden_size)
+        # for input to softmax of end distribution. This is how it is defined in the paper.
+        blended_reps_end = tf.concat([blended_reps_bi, blended_reps_final2], axis=2)
+        #blended_reps_final = tf.contrib.layers.fully_connected(blended_reps, num_outputs=self.FLAGS.hidden_size) # blended_
+        # reps_final is shape (batch_size, context_len, hidden_size)
 
         # Use softmax layer to compute probability distribution for start location
         # Note this produces self.logits_start and self.probdist_start, both of which have shape (batch_size, context_len)
         with vs.variable_scope("StartDist"):
             softmax_layer_start = SimpleSoftmaxLayer()
-            self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
-
+            #self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
+            self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_start,
+                                                                                     self.context_mask)
         # Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
             softmax_layer_end = SimpleSoftmaxLayer()
-            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
+            #self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
+            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, self.context_mask)
 
 
     def add_loss(self):
