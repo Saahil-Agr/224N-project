@@ -56,7 +56,7 @@ tf.app.flags.DEFINE_integer("embedding_size", 50, "Size of the pretrained word v
 tf.app.flags.DEFINE_integer("char_window_size",5, "Width of conv filter for char embedding")
 tf.app.flags.DEFINE_integer("char_filter_num",100, "Numer of conv filters")
 tf.app.flags.DEFINE_integer("word_len",15, "The maximum number of characters for any word in corpous")
-tf.app.flags.DEFINE_integer("char_embedding_size",100, "The dimension of character embeddings")
+tf.app.flags.DEFINE_integer("char_embedding_size",20, "The dimension of character embeddings")
 # TODO update to support CNN embedding parameters
 
 # How often to print, save, eval
@@ -133,6 +133,7 @@ def main(unused_argv):
                                                         "char_vocabulary.txt")
 
     # Load embedding matrix and vocab mappings
+    #TODO remove comment
     emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
 
     # Load character mappings
@@ -147,7 +148,7 @@ def main(unused_argv):
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
 
     # Initialize model
-    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix,id2char,char2id)
+    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix, id2char, char2id)
 
     # Some GPU settings
     config=tf.ConfigProto()

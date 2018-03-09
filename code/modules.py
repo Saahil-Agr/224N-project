@@ -25,7 +25,7 @@ class CNNEmbedding(object):
     Yoon Kim Convolutional Neural Networks for Sentence Classification, 2014
     Intention is to implement with pretrain GLOVE embeddings
     """
-    def __init__(self, window_size,feature_map_size, embedding_size, keep_prob,l2_max):
+    def __init__(self, window_size,feature_map_size, embedding_size, word_length, keep_prob,l2_max):
         """
         Initialize hyper-parameters
         :param: window_size: [int] List of window sizes
@@ -34,21 +34,25 @@ class CNNEmbedding(object):
         :param: keep_prob: dropout parameter
         :param: l2_max: l2 constraint, no effect if 0
         """
-        self.window_size = window_size
+        self.embedding_length = embedding_size
         # simple minimal type checking
         if not isinstance(feature_map_size, list):
             self.feature_map_size = [feature_map_size]
         else:
             self.feature_map_size = feature_map_size
-        if not isinstance(embedding_size,list):
-            self.embedding_length = [embedding_size]
+        if not isinstance(window_size,list):
+            self.window_size = [window_size]
         else:
-            self.embedding_length = embedding_size
+            self.window_size = window_size
+        self.word_length = word_length
+        #TODO raise this to init call
+        self.char_vocab_size = 62
         #TODO: verify these are necessary
         self.keep_prob = keep_prob
         self. l2_max = l2_max
 
-    def build_graph(self,inputs, mask, stride = 1):
+    def build_graph(self,char_ids, mask, context_length, Q, scope = None, stride = 1):
+        # TODO update documentation
         """
         :param: inputs: Tensor shape (batch_size, context_length, char_tokenization_length)
         :param: mask: identifies which characters are valid
@@ -60,26 +64,35 @@ class CNNEmbedding(object):
         if stride >1:
             raise NotImplementedError
 
-        with vs.variable_scope("CNN_Embedding"):
-            #TODO: verify efficient output concatenation method
-            Q = tf.get_variable('Q', shape = )
+        with vs.variable_scope(scope or "CNN Embedding",reuse = tf.AUTO_REUSE):
+            # trainable embedding matrix
+            # We should pass Q in
+            #Q = tf.get_variable('Q', shape = [self.embedding_length,self.char_vocab_size],
+            #                    initializer = tf.contrib.layers.xavier_initializer())
+            # look up char vector embedding
+            inputs = tf.nn.embedding_lookup(Q, char_ids)
+            # reshape appropriately
+            #inputs = tf.reshape(inputs,[-1,context_length,self.word_length,self.embedding_length])
             context_length = inputs.get_shape()[-2] # Get context length
             #outputs = tf.get_variable('CharEmbedding',shape = [-1, context_length, Total_Output_Length])
             inputSize = inputs.get_shape()[-1] # Get number of channels
             # add dummy height [batch,1,context_len,embedding] so we can make direct calls
-            inputs = tf.expand_dims(inputs,axis = 1)
+            #inputs = tf.expand_dims(inputs,axis = 1)
             for window,filter_num in zip(self.window_size,self.feature_map_size):
                 #TODO our actual window is over # chars and chars have length embedding size, address this
                 # output_size is number of feature maps for given window width
-                output_size = (inputSize-window+1)*filter_num
+                output_size = filter_num
                 # create our temporal filter
                 filt = tf.get_variable("Temporal_Filter",shape=[1,window,inputSize,output_size])
+                bias = tf.get_variable("bias",shape =filter_num,dtype="float",initializer = tf.zeros_initializer())
+                if self.keep_prob<1.0:
+                    inputs = tf.nn.dropout(inputs,self.keep_prob)
                 # Perform our convolution
                 conv = tf.nn.conv2d(inputs, filt,strides = [1,1,stride,1],padding = 'SAME')
                 # Temporal pool
-                pool = tf.nn.max_pool(conv,[1,1,1,inputSize-window+1],[1,1,1,inputSize-window+1],padding = 'VALID')
+                pool = tf.reduce_max(tf.nn.relu(conv),axis=2)
                 # Append featuremaps together for output, remove dummy height
-                pool = tf.squeeze(pool,axis=1)
+                #pool = tf.squeeze(pool,axis=1)
         return pool
 
 class RNNEncoder(object):

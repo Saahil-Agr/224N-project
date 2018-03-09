@@ -26,10 +26,13 @@ _UNK = b"<unk>"
 _START_VOCAB = [_PAD, _UNK]
 PAD_ID = 0
 UNK_ID = 1
-#TODO create this for char embeddings
 #Per bidaf we have a start word char,end word char and unknown char
-#_CHAR_START_VOCAB = [_START,_END, _UNKC]
-_CHAR_START_VOCAB = []
+_START = b"<strt>"
+_END = b"<end>"
+START_ID = 2
+END_ID = 3
+_CHAR_START_VOCAB = [_PAD, _UNK, _START, _END]
+
 
 def get_glove(glove_path, glove_dim):
     """Reads from original GloVe .txt file and returns embedding matrix and
@@ -98,8 +101,8 @@ def get_char(char_path, char_dim=0, char_embedding = False):
     vocab_size = 62 #current number of characters we are supporting
     #TODO evaluate this design decision
     #vocab_size = int(4e5) # this is the vocab size of the corpus we've downloaded
-
-    if char_embedding is True:
+    print(char_embedding)
+    if char_embedding:
         char_emb_matrix = np.zeros((vocab_size + len(_START_VOCAB), glove_dim))
     else:
         char_emb_matrix = None
@@ -110,6 +113,7 @@ def get_char(char_path, char_dim=0, char_embedding = False):
     # randomly initialize the special tokens
     if random_init and char_embedding:
         emb_matrix[:len(_START_VOCAB), :] = np.random.randn(len(_START_VOCAB), glove_dim)
+
 
     # put start tokens in the dictionaries
     idx = 0

@@ -90,10 +90,10 @@ class QAModel(object):
         # These are all batch-first: the None corresponds to batch_size and
         # allows you to run the same model with variable batch_size
         self.context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
-        self.char_context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len, self.FLAGS.word_len])
+        self.char_context_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len, self.FLAGS.word_len+2])
         self.context_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
         self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.char_qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len, self.FLAGS.word_len])
+        self.char_qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len, self.FLAGS.word_len+2])
         self.qn_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
         self.ans_span = tf.placeholder(tf.int32, shape=[None, 2])
 
@@ -133,14 +133,18 @@ class QAModel(object):
         """
 
         # Create character level embeddings
-        #TODO hand in actual arguments
         #Context
+        # raise vocab size, 64 to accessible varibale
+        Q = tf.get_variable('Q', shape=[62+1+1+1+1, self.FLAGS.char_embedding_size],
+                            initializer = tf.contrib.layers.xavier_initializer())
         char_embedder = CNNEmbedding(self.FLAGS.char_window_size,self.FLAGS.char_filter_num,
-                                     self.FLAGS.char_embedding_size, 0,0)
-        char_context_emb = char_embedder.build_graph(self.char_context_ids,self.context_mask)
+                                     self.FLAGS.char_embedding_size, self.FLAGS.word_len, 1,1)
+        char_context_emb = char_embedder.build_graph(self.char_context_ids,self.context_mask,self.FLAGS.context_len, Q,
+                                                     scope = "Context_Emb")
         self.full_context_embs = tf.concat([self.context_embs,char_context_emb],axis=2)
         #question
-        char_qn_emb = char_embedder.build_graph(self.char_qn_ids, self.qn_mask)
+        char_qn_emb = char_embedder.build_graph(self.char_qn_ids, self.qn_mask, self.FLAGS.question_len, Q,
+                                                scope="Question_Emb")
         self.full_qn_embs = tf.concat([self.qn_embs, char_qn_emb], axis=2)
         #TODO trace self.context_embs through the code to see where we need to update this
 
@@ -484,7 +488,10 @@ class QAModel(object):
             epoch_tic = time.time()
 
             # Loop over batches
-            for batch in get_batch_generator(self.word2id, train_context_path, train_qn_path, train_ans_path, self.FLAGS.batch_size, context_len=self.FLAGS.context_len, question_len=self.FLAGS.question_len, discard_long=True):
+            for batch in get_batch_generator(self.word2id, train_context_path, train_qn_path, train_ans_path,
+                                             self.FLAGS.batch_size, context_len=self.FLAGS.context_len,
+                                             question_len=self.FLAGS.question_len, discard_long=True,
+                                             word_length = self.FLAGS.word_len, char2id = self.char2id):
 
                 # Run training iteration
                 iter_tic = time.time()

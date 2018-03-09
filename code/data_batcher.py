@@ -24,7 +24,7 @@ import re
 
 import numpy as np
 from six.moves import xrange
-from vocab import PAD_ID, UNK_ID
+from vocab import PAD_ID, UNK_ID, START_ID, END_ID
 
 
 class Batch(object):
@@ -72,15 +72,34 @@ def intstr_to_intlist(string):
     """Given a string e.g. '311 9 1334 635 6192 56 639', returns as a list of integers"""
     return [int(s) for s in string.split()]
 
-def sentence_to_char_token_ids(sentence, char2id):
+def sentence_to_char_token_ids(sentence, char2id, word_len, sentence_len):
     """
     :param sentence: string
     :param word2list: dictionary mapping from char to id
     :return: id_list: [[int]] list of character id lists for each word
     """
     tokens = split_by_whitespace(sentence)  # list of strings
-    #TODO add start and end token to the words
-    ids_list = [[char2id.get(ch, UNK_ID) for ch in w] for w in tokens]
+    ids_list = []
+    #TODO determine more efficient soln
+    for w_idx,w in enumerate(tokens):
+        temp_list = [START_ID]
+        for ch_idx,ch in enumerate(w):
+            temp_list.append(char2id.get(ch,UNK_ID))
+            if len(temp_list) == word_len+1 :
+                break
+        temp_list.append(END_ID)
+        if len(temp_list)<(word_len+2):
+            temp_list = temp_list + [PAD_ID]*((word_len+2) - len(temp_list))
+        if len(temp_list)!=(word_len+2):
+            print("Failed Word Length")
+            print(len(temp_list))
+        ids_list.append(temp_list)
+    if len(ids_list) < sentence_len:
+        ids_list = ids_list + [[PAD_ID]*(word_len+2)]*(sentence_len - len(ids_list))
+    if len(ids_list) < sentence_len:
+        print("Failed Sentence Length\n")
+        print(len(ids_list))
+        print(ids_list)
     return ids_list
 
 def sentence_to_token_ids(sentence, word2id):
@@ -102,13 +121,12 @@ def padded(token_batch, batch_pad=0):
       List (length batch_size) of padded of lists of ints.
         All are same length - batch_pad if batch_pad!=0, otherwise the maximum length in token_batch
     """
-    #TODO make sure char id lists are padding
     maxlen = max(map(lambda x: len(x), token_batch)) if batch_pad == 0 else batch_pad
     return map(lambda token_list: token_list + [PAD_ID] * (maxlen - len(token_list)), token_batch)
 
 
 def refill_batches(batches, word2id, context_file, qn_file, ans_file,
-                   batch_size, context_len, question_len, discard_long,char2id = None):
+                   batch_size, context_len, question_len, discard_long, char2id, word_length):
     """
     Adds more batches into the "batches" list.
 
@@ -131,9 +149,21 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file,
 
         # Convert tokens to word ids
         context_tokens, context_ids = sentence_to_token_ids(context_line, word2id)
-        char_context_ids = sentence_to_char_token_ids(context_line, char2id)
+        char_context_ids = sentence_to_char_token_ids(context_line, char2id, word_length, context_len)
+        # print('Direct Output From Function')
+        # padded_count = 0
+        # unpadded_count = 0
+        # for word in char_context_ids:
+        #     if len(word) == (word_length+2):
+        #         padded_count+=1
+        #     elif len(word) == word_length:
+        #         unpadded_count += 1
+        #     else:
+        #         print(len(word))
+        # print(padded_count)
+        # print(unpadded_count)
         qn_tokens, qn_ids = sentence_to_token_ids(qn_line, word2id)
-        char_qn_ids = sentence_to_char_token_ids(qn_line, char2id)
+        char_qn_ids = sentence_to_char_token_ids(qn_line, char2id, word_length, question_len)
         ans_span = intstr_to_intlist(ans_line)
 
         # read the next line from each file
@@ -192,7 +222,8 @@ def refill_batches(batches, word2id, context_file, qn_file, ans_file,
     return
 
 
-def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, context_len, question_len, discard_long):
+def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, context_len, question_len,
+                        discard_long, char2id = None, word_length = 1):
     """
     This function returns a generator object that yields batches.
     The last batch in the dataset will be a partial batch.
@@ -211,7 +242,8 @@ def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, co
 
     while True:
         if len(batches) == 0: # add more batches
-            refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len, question_len, discard_long)
+            refill_batches(batches, word2id, context_file, qn_file, ans_file, batch_size, context_len,
+                           question_len, discard_long, char2id, word_length)
         if len(batches) == 0:
             break
 
@@ -220,9 +252,9 @@ def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, co
 
         # Pad context_ids and qn_ids
         qn_ids = padded(qn_ids, question_len) # pad questions to length question_len
-        char_qn_ids = padded(char_qn_ids, question_len)  # pad questions to length question_len
+        #char_qn_ids = padded(char_qn_ids, question_len)  # pad questions to length question_len
         context_ids = padded(context_ids, context_len) # pad contexts to length context_len
-        char_context_ids = padded(char_context_ids, context_len)  # pad contexts to length context_len
+        #char_context_ids = padded(char_context_ids, context_len)  # pad contexts to length context_len
 
         # Make qn_ids into a np array and create qn_mask
         qn_ids = np.array(qn_ids) # shape (question_len, batch_size)
@@ -231,7 +263,7 @@ def get_batch_generator(word2id, context_path, qn_path, ans_path, batch_size, co
 
         # Make context_ids into a np array and create context_mask
         context_ids = np.array(context_ids) # shape (context_len, batch_size)
-        char_qn_ids = np.array(context_ids)
+        char_context_ids = np.array(char_context_ids)
         context_mask = (context_ids != PAD_ID).astype(np.int32) # shape (context_len, batch_size)
 
         # Make ans_span into a np array
