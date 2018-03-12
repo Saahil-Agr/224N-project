@@ -44,19 +44,21 @@ tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experime
 tf.app.flags.DEFINE_integer("num_epochs", 1, "Number of epochs to train. 0 means train indefinitely")
 
 # Hyperparameters
-tf.app.flags.DEFINE_float("learning_rate", 0.001, "Learning rate.")
-tf.app.flags.DEFINE_float("max_gradient_norm", 5.0, "Clip gradients to this norm.")
-tf.app.flags.DEFINE_float("dropout", 0.15, "Fraction of units randomly dropped on non-recurrent connections.")
+tf.app.flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
+tf.app.flags.DEFINE_float("lr_decay", 0.999, "Learning rate Decay.")
+tf.app.flags.DEFINE_float("max_gradient_norm", 10.0, "Clip gradients to this norm.")
+tf.app.flags.DEFINE_float("dropout", 0.2, "Fraction of units randomly dropped on non-recurrent connections.")
 tf.app.flags.DEFINE_integer("batch_size", 60, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
 tf.app.flags.DEFINE_integer("context_len", 400, "The maximum context length of your model")
 tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
 tf.app.flags.DEFINE_integer("embedding_size", 50, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
 # CHAR CNN Hyperparams
+tf.app.flags.DEFINE_bool("char_embedding",False, "Flag to do Character embedding or not")
 tf.app.flags.DEFINE_integer("char_window_size",5, "Width of conv filter for char embedding")
 tf.app.flags.DEFINE_integer("char_filter_num",100, "Numer of conv filters")
 tf.app.flags.DEFINE_integer("word_len",15, "The maximum number of characters for any word in corpous")
-tf.app.flags.DEFINE_integer("char_embedding_size",20, "The dimension of character embeddings")
+tf.app.flags.DEFINE_integer("char_embedding_size",50, "The dimension of character embeddings")
 # TODO update to support CNN embedding parameters
 
 # How often to print, save, eval
@@ -129,15 +131,18 @@ def main(unused_argv):
     FLAGS.glove_path = FLAGS.glove_path or os.path.join(DEFAULT_DATA_DIR, "glove.6B.{}d.txt".format(FLAGS.embedding_size))
 
     # Define path for character vecs
-    FLAGS.char_path = FLAGS.char_path or os.path.join(DEFAULT_DATA_DIR,
+    if FLAGS.char_embedding:
+        FLAGS.char_path = FLAGS.char_path or os.path.join(DEFAULT_DATA_DIR,
                                                         "char_vocabulary.txt")
 
     # Load embedding matrix and vocab mappings
-    #TODO remove comment
     emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
 
     # Load character mappings
-    char_emb_matrix, char2id, id2char = get_char(FLAGS.char_path)
+    if FLAGS.char_embedding:
+        char_emb_matrix, char2id, id2char = get_char(FLAGS.char_path)
+    else:
+        char_emb_matrix, char2id, id2char = None, None, None
 
     # Get filepaths to train/dev datafiles for tokenized queries, contexts and answers
     train_context_path = os.path.join(FLAGS.data_dir, "train.context")
@@ -148,7 +153,7 @@ def main(unused_argv):
     dev_ans_path = os.path.join(FLAGS.data_dir, "dev.span")
 
     # Initialize model
-    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix, id2char, char2id)
+    qa_model = QAModel(FLAGS, id2word, word2id, emb_matrix, id2char, char2id,char_emb_matrix)
 
     # Some GPU settings
     config=tf.ConfigProto()
@@ -189,6 +194,14 @@ def main(unused_argv):
             # Show examples with F1/EM scores
             _, _ = qa_model.check_f1_em(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10, print_to_screen=True)
 
+    elif FLAGS.mode == "generate_statistics":
+        with tf.Session(config=config) as sess:
+
+            # Load best model
+            initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
+
+            # Show examples with F1/EM scores
+            _ = qa_model.gen_stats(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10, print_to_screen=True)
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":
