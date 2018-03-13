@@ -32,12 +32,11 @@ class HighWayNetwork(object):
 
     def build_graph(self, x, output_size):
         """
-        :param x:
-        :param W_H:
-        :param W_T:
-        :return:
+        :param: x input tensor
+        :return: y output tensor
         """
-        x_hat = tf.contrib.layers.fully_connected(x, output_size)
+        #x_hat = tf.contrib.layers.fully_connected(x, output_size)
+        x_hat = x
         H = tf.contrib.layers.fully_connected(x_hat,output_size)
         T = tf.contrib.layers.fully_connected(x_hat, output_size)
         y = H*T+x_hat*(1-T)
@@ -109,8 +108,7 @@ class CNNEmbedding(object):
                 # create our temporal filter
                 filt = tf.get_variable("Temporal_Filter",shape=[1,window,inputSize,output_size])
                 bias = tf.get_variable("bias",shape =filter_num,dtype="float",initializer = tf.zeros_initializer())
-                if self.keep_prob<1.0:
-                    inputs = tf.nn.dropout(inputs,self.keep_prob)
+                inputs = tf.nn.dropout(inputs,self.keep_prob)
                 # Perform our convolution
                 conv = tf.nn.conv2d(inputs, filt,strides = [1,1,stride,1],padding = 'SAME')
                 # Temporal pool

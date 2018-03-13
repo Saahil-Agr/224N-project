@@ -147,14 +147,14 @@ class QAModel(object):
                                                          scope = "Context_Emb")
             self.full_context_embs = tf.concat([self.context_embs,char_context_emb],axis=2)
             # Highway Network
-            #highway_network = HighWayNetwork()
-            #self.full_context_embs = highway_network.build_graph(self.full_context_embs,self.FLAGS.embedding_size)
+            highway_network = HighWayNetwork()
+            self.full_context_embs = highway_network.build_graph(self.full_context_embs,2*self.FLAGS.embedding_size)
             #question
             char_qn_emb = char_embedder.build_graph(self.char_qn_ids, self.qn_mask, self.FLAGS.question_len, Q,
                                                     scope="Question_Emb")
             self.full_qn_embs = tf.concat([self.qn_embs, char_qn_emb], axis=2)
             # Highway network
-            #self.full_qn_embs = highway_network.build_graph(self.full_qn_embs, self.FLAGS.embedding_size)
+            self.full_qn_embs = highway_network.build_graph(self.full_qn_embs, 2*self.FLAGS.embedding_size)
         else:
             self.full_context_embs =self.context_embs
             self.full_qn_embs = self.qn_embs

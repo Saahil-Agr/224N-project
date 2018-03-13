@@ -52,9 +52,9 @@ tf.app.flags.DEFINE_integer("batch_size", 60, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
 tf.app.flags.DEFINE_integer("context_len", 400, "The maximum context length of your model")
 tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
-tf.app.flags.DEFINE_integer("embedding_size", 50, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
+tf.app.flags.DEFINE_integer("embedding_size", 100, "Size of the pretrained word vectors. This needs to be one of the available GloVe dimensions: 50/100/200/300")
 # CHAR CNN Hyperparams
-tf.app.flags.DEFINE_bool("char_embedding",False, "Flag to do Character embedding or not")
+tf.app.flags.DEFINE_bool("char_embedding",True, "Flag to do Character embedding or not")
 tf.app.flags.DEFINE_integer("char_window_size",5, "Width of conv filter for char embedding")
 tf.app.flags.DEFINE_integer("char_filter_num",100, "Numer of conv filters")
 tf.app.flags.DEFINE_integer("word_len",15, "The maximum number of characters for any word in corpous")
@@ -143,6 +143,7 @@ def main(unused_argv):
         char_emb_matrix, char2id, id2char = get_char(FLAGS.char_path)
     else:
         char_emb_matrix, char2id, id2char = None, None, None
+    print(char2id is not None)
 
     # Get filepaths to train/dev datafiles for tokenized queries, contexts and answers
     train_context_path = os.path.join(FLAGS.data_dir, "train.context")

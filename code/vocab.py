@@ -101,7 +101,6 @@ def get_char(char_path, char_dim=0, char_embedding = False):
     vocab_size = 87 #current number of characters we are supporting
     #TODO evaluate this design decision
     #vocab_size = int(4e5) # this is the vocab size of the corpus we've downloaded
-    print(char_embedding)
     if char_embedding:
         char_emb_matrix = np.zeros((vocab_size + len(_START_VOCAB), glove_dim))
     else:
