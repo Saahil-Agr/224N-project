@@ -90,7 +90,7 @@ class QAModel(object):
         self.context_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.context_len])
         self.qn_ids = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
         self.qn_mask = tf.placeholder(tf.int32, shape=[None, self.FLAGS.question_len])
-        self.ans_span = tf.placeholder(tf.int32, shape=[None, 2])
+        self.ans_span  = tf.placeholder(tf.int32, shape=[None, 2])
 
         # Add a placeholder to feed in the keep probability (for dropout).
         # This is necessary so that we can instruct the model to use dropout when training, but not when testing
@@ -142,7 +142,7 @@ class QAModel(object):
         #question_hiddens_exp = tf.tile(question_hiddens_exp, [1, self.FLAGS.context_len, 1, 1]) #(batch_size, context_len,
                                                                                                 # question_len, hidden_size*2)
         #print question_hiddens_exp.get_shape(), context_hiddens_exp.get_shape()
-        e_multiplied = tf.multiply(context_hiddens_exp, question_hiddens_exp)
+        e_multiplied = tf.multiply(context_hiddens_exp, question_hiddens_exp) # N,M,2h
        # S_intermediate = tf.concat([context_hiddens_exp, question_hiddens_exp, e_multiplied], 3)
         #print e_multiplied.get_shape(), S_intermediate.get_shape()
         W_A = tf.get_variable("W_BiDaff", shape=[1,1,1,self.FLAGS.hidden_size * 6],
@@ -180,13 +180,14 @@ class QAModel(object):
         # Note, blended_reps_final corresponds to b' in the handout
         # Note, tf.contrib.layers.fully_connected applies a ReLU non-linarity here by default
 
-        modelling = BiLSTM(self.FLAGS.hidden_size,self.keep_prob)
-        modelling2 = BiLSTM2(self.FLAGS.hidden_size,self.keep_prob)
-        blended_reps_int = modelling.build_graph(blended_reps_bi,self.context_mask) #shape(batch_size,context_len,2*hidden_size)
+        modelling = BiLSTM(self.FLAGS.hidden_size, self.keep_prob)
+        modelling2 = BiLSTM(self.FLAGS.hidden_size,self.keep_prob)
+        modelling3 = BiLSTM(self.FLAGS.hidden_size,self.keep_prob)
+        blended_reps_int = modelling.build_graph(blended_reps_bi,self.context_mask,"BiLSTM1") #shape(batch_size,context_len,2*hidden_size)
        #print "blended vector after LSTM", blended_reps_int.get_shape(), "Blended vector after BiDaff", blended_reps_bi.get_shape()
-        blended_reps_final = modelling2.build_graph(blended_reps_int,self.context_mask) #shape(batch_size,context_len,2*hidden_size)
+        blended_reps_final = modelling2.build_graph(blended_reps_int,self.context_mask,"BiLSTM2") #shape(batch_size,context_len,2*hidden_size)
         blended_reps_start = tf.concat([blended_reps_bi,blended_reps_final],axis = 2)
-        blended_reps_final2 = modelling2.build_graph(blended_reps_final,self.context_mask)
+        blended_reps_final2 = modelling3.build_graph(blended_reps_final,self.context_mask,"BiLSTM3")
         # shape(batch_size,context_len,2*hidden_size)
         # for input to softmax of end distribution. This is how it is defined in the paper.
         blended_reps_end = tf.concat([blended_reps_bi, blended_reps_final2], axis=2)
