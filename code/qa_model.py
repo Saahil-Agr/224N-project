@@ -521,7 +521,7 @@ class QAModel(object):
 
         return f1_total, em_total
 
-    def gen_stats(self, session, context_path, qn_path, ans_path, dataset, num_samples=100, print_to_screen=False):
+    def gen_stats(self, session, context_path, qn_path, ans_path):
         """
         Generate a variety of statistics to get a more holistic view of how the model is performing
         :param session:
@@ -533,6 +533,52 @@ class QAModel(object):
         :param print_to_screen:
         :return:
         """
+        list_of_data_tuples=[]
+
+        # For every batch
+        for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path,
+                                         self.FLAGS.batch_size, context_len=self.FLAGS.context_len,
+                                         question_len=self.FLAGS.question_len, discard_long=True,
+                                         word_length=self.FLAGS.word_len, char2id=self.char2id):
+            pred_start_pos, pred_end_pos = self.get_start_end_pos(session, batch)
+
+            # Convert the start and end positions to lists length batch_size
+            pred_start_pos = pred_start_pos.tolist()  # list length batch_size
+            pred_end_pos = pred_end_pos.tolist()  # list length batch_size
+
+            # For every question in a batch
+            for ex_idx, (pred_ans_start, pred_ans_end, true_ans_tokens) in enumerate(
+                zip(pred_start_pos, pred_end_pos, batch.ans_tokens)):
+                # Get the predicted answer
+                # Important: batch.context_tokens contains the original words (no UNKs)
+                # You need to use the original no-UNK version when measuring F1/EM
+                pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start: pred_ans_end + 1]
+                pred_answer = " ".join(pred_ans_tokens)
+
+                # Get true answer (no UNKs)
+                true_answer = " ".join(true_ans_tokens)
+
+                # Calc F1/EM
+                f1 = f1_score(pred_answer, true_answer)
+                em = exact_match_score(pred_answer, true_answer)
+
+                # Calc interesting things
+                true_answer_length = len(true_answer)
+                pred_answer_length = len(pred_ans_tokens)
+                if "where" in batch.qn_tokens or "Where" in batch.qn_tokens:
+                    question_type = "where"
+                if "when" in batch.qn_tokens or "When" in batch.qn_tokens:
+                    question_type = "when"
+                if "how" in batch.qn_tokens or "how" in batch.qn_tokens:
+                    question_type = "how"
+                if "why" in batch.qn_tokens or "Why" in batch.qn_tokens:
+                    question_type = "why"
+                if "what" in batch.qn_tokens or "What" in batch.qn_tokens:
+                    question_type = "what"
+                else:
+                    question_type = "other"
+                list_of_data_tuples.append((f1,em,question_type,true_answer_length,pred_answer_length))
+        return list_of_data_tuples
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
         """

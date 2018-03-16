@@ -202,7 +202,7 @@ def main(unused_argv):
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
 
             # Show examples with F1/EM scores
-            _ = qa_model.gen_stats(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10, print_to_screen=True)
+            _ = qa_model.gen_stats(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":
