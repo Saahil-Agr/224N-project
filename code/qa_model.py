@@ -21,6 +21,7 @@ import time
 import logging
 import os
 import sys
+import pdb
 
 import numpy as np
 import tensorflow as tf
@@ -30,7 +31,7 @@ from tensorflow.python.ops import embedding_ops
 from evaluate import exact_match_score, f1_score
 from data_batcher import get_batch_generator
 from pretty_print import print_example
-from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff, BiLSTM,BiLSTM2
+from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff, BiLSTM, Self_Attention
 
 logging.basicConfig(level=logging.INFO)
 
@@ -159,6 +160,28 @@ class QAModel(object):
         #print "S", S.get_shape()
         biAttn_layer = BiDaff(self.keep_prob, self.FLAGS.hidden_size*2, self.FLAGS.hidden_size*2)
         c2q,q2c = biAttn_layer.build_graph(question_hiddens,self.qn_mask,context_hiddens,self.context_mask,S)
+
+        #################### Self attention
+        arbit = 100
+        W_1 = tf.get_variable("W_1", shape=[self.FLAGS.batch_size,2 * self.FLAGS.hidden_size, arbit],
+                              initializer=tf.contrib.layers.xavier_initializer())
+        W_2 = tf.get_variable("W_2", shape=[self.FLAGS.batch_size,2 * self.FLAGS.hidden_size, arbit], initializer=tf.contrib.layers.xavier_initializer())
+        V = tf.get_variable("V", shape=[1,1,1,arbit],
+                            initializer=tf.contrib.layers.xavier_initializer())
+
+        hj = tf.matmul(context_hiddens, W_1)  # (batch_size,context_length,arbit)
+        #hj = tf.reshape(hj,[])
+        hi = tf.matmul(context_hiddens, W_2) # (batch_size,context_length,arbit)
+        hj = tf.expand_dims(hj, axis=1) # (batch_size,1, context_length,arbit)
+        hi = tf.expand_dims(hi, axis=2) # (batch_size,context_length,1,arbit)
+        h = hi+hj # (batch_size,context_length, context_length,arbit)
+        h2 = tf.tanh(h)  # (batch_size,context_length, context_length,arbit)
+        e = tf.reduce_sum(tf.multiply(h2, V), axis=3)  # (batch_size,context_length, context_length)
+        print e.get_shape()
+        selfAttention_layer = Self_Attention(self.keep_prob,self.FLAGS.hidden_size*2)
+        a_self = selfAttention_layer.build_graph(context_hiddens,self.context_mask,e)
+        ###############################
+
         #print c2q.get_shape(), q2c.get_shape()
         #q2c = tf.expand_dims(q2c, 1) # shape(batch_size,1,context_vec_size)
         q2c = tf.tile(q2c, [1,self.FLAGS.context_len,1]) # shape(batch_size,context_vec_size,context_vec_size)
@@ -166,7 +189,7 @@ class QAModel(object):
         c_c2q = tf.multiply(context_hiddens,c2q) #shape(batch_size,num_question,hidden_size*2)
         c_q2c = tf.multiply(context_hiddens, q2c) #shape(batch_size,num_question,hidden_size*2)
         #print c_c2q.get_shape(), c_q2c.get_shape()
-        blended_reps_bi = tf.concat([context_hiddens, c2q, c_c2q,c_q2c],axis = 2)  #shape(batch_size,num_context,hidden_size*8)
+        blended_reps_bi = tf.concat([context_hiddens, c2q, c_c2q,c_q2c,a_self],axis = 2)  #shape(batch_size,num_context,hidden_size*8)
 
 
         # ########################
@@ -183,11 +206,13 @@ class QAModel(object):
         modelling = BiLSTM(self.FLAGS.hidden_size, self.keep_prob)
         modelling2 = BiLSTM(self.FLAGS.hidden_size,self.keep_prob)
         modelling3 = BiLSTM(self.FLAGS.hidden_size,self.keep_prob)
+        modelling4 = BiLSTM(self.FLAGS.hidden_size, self.keep_prob)
         blended_reps_int = modelling.build_graph(blended_reps_bi,self.context_mask,"BiLSTM1") #shape(batch_size,context_len,2*hidden_size)
        #print "blended vector after LSTM", blended_reps_int.get_shape(), "Blended vector after BiDaff", blended_reps_bi.get_shape()
-        blended_reps_final = modelling2.build_graph(blended_reps_int,self.context_mask,"BiLSTM2") #shape(batch_size,context_len,2*hidden_size)
+        blended_reps_semifinal = modelling2.build_graph(blended_reps_int,self.context_mask,"BiLSTM2") #shape(batch_size,context_len,2*hidden_size)
+        blended_reps_final = modelling3.build_graph(blended_reps_semifinal, self.context_mask, "BiLSTM3") # added one more layer
         blended_reps_start = tf.concat([blended_reps_bi,blended_reps_final],axis = 2)
-        blended_reps_final2 = modelling3.build_graph(blended_reps_final,self.context_mask,"BiLSTM3")
+        blended_reps_final2 = modelling4.build_graph(blended_reps_final,self.context_mask,"BiLSTM4")
         # shape(batch_size,context_len,2*hidden_size)
         # for input to softmax of end distribution. This is how it is defined in the paper.
         blended_reps_end = tf.concat([blended_reps_bi, blended_reps_final2], axis=2)
@@ -201,12 +226,29 @@ class QAModel(object):
             #self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
             self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_start,
                                                                                      self.context_mask)
+            print "start_pos", self.probdist_start.get_shape()
         # Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
+            pos_start = tf.argmax(self.probdist_start,axis=1,output_type=tf.int32) # shape batch_size
+            new_context_mask = self.context_mask
+            #for i in range(self.FLAGS.batch_size):
+            #    new_context_mask[i,:] = tf.concat([tf.constant(np.zeros((self.FLAGS.batch_size,pos_start[i]))), Q[:,
+                                                                                        #pos_start[i]+1:]], axis=1)
+            st = tf.sequence_mask(pos_start,self.FLAGS.context_len)
+            st = tf.cast(st,dtype=tf.int32)
+            st = tf.negative(st)
+            st = st+1
+            new_context_mask = tf.multiply(self.context_mask,st)
+            #print pos_start
+
+            #pdb.set_trace()
+            #new2 = tf.assign(self.context_mask[:,pos_start+1],np.zeros((60,)))
+            print "new mask", new_context_mask.get_shape()
+            #new_context_mask[:pos_start+1] = 0 # changed context mask such that masked everything before start position
             softmax_layer_end = SimpleSoftmaxLayer()
             #self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
-            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, self.context_mask)
+            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, new_context_mask)# new_context_mask)
 
 
     def add_loss(self):
@@ -264,6 +306,7 @@ class QAModel(object):
         input_feed = {}
         input_feed[self.context_ids] = batch.context_ids
         input_feed[self.context_mask] = batch.context_mask
+        print batch.context_mask[0,0]
         input_feed[self.qn_ids] = batch.qn_ids
         input_feed[self.qn_mask] = batch.qn_mask
         input_feed[self.ans_span] = batch.ans_span

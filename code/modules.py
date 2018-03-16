@@ -282,6 +282,30 @@ class BiLSTM(object):
 
             return out
 
+class Self_Attention(object):
+    """Self attention layer that computes the context aware representation of context"""
+    def __init__(self, keep_prob,context_vec_size):
+        """
+        Inputs:
+          keep_prob: tensor containing a single scalar that is the keep probability (for dropout)
+          key_vec_size: size of the key vectors. int
+          value_vec_size: size of the value vectors. int
+        """
+        self.keep_prob = keep_prob
+        self.context_vec_size = context_vec_size
+    def build_graph(self,context,context_mask,att_vec):
+        """
+        Inputs
+        :param context: context hidden vector of shape (batch_size, context_len, 2*hidden_size)
+        :param context_mask: of vector (batch_size, context_len)
+        :param att_vec: vector computed in the begining using tanh N*N
+        :return: a_self : the final self attention vector for context of N*2h
+        """
+        with vs.variable_scope("self_attention"):
+            _,alpha = masked_softmax(att_vec,context_mask,1) # shape( batch_size, context_len, context_len)
+            print att_vec.get_shape(), "alpha", alpha.get_shape()
+            a_self = tf.matmul(alpha, context)  # shape( batch_size, context_len, 2*hidden_size)
+            return a_self
 
 def masked_softmax(logits, mask, dim):
     """
