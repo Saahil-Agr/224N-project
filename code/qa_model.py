@@ -534,6 +534,7 @@ class QAModel(object):
         :return:
         """
         list_of_data_tuples=[]
+        count =0
 
         # For every batch
         for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path,
@@ -563,7 +564,7 @@ class QAModel(object):
                 em = exact_match_score(pred_answer, true_answer)
 
                 # Calc interesting things
-                true_answer_length = len(true_answer)
+                true_answer_length = len(true_ans_tokens)
                 pred_answer_length = len(pred_ans_tokens)
                 if "where" in batch.qn_tokens or "Where" in batch.qn_tokens:
                     question_type = "where"
@@ -578,6 +579,9 @@ class QAModel(object):
                 else:
                     question_type = "other"
                 list_of_data_tuples.append((f1,em,question_type,true_answer_length,pred_answer_length))
+            count += 1
+            if count%20==0:
+                print("Batch #: "+str(count))
         return list_of_data_tuples
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
