@@ -27,7 +27,7 @@ import tensorflow as tf
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import embedding_ops
 
-from evaluate import exact_match_score, f1_score
+from evaluate import exact_match_score, f1_score, normalize_answer
 from data_batcher import get_batch_generator
 from pretty_print import print_example
 from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, CNNEmbedding
@@ -564,8 +564,8 @@ class QAModel(object):
                 em = exact_match_score(pred_answer, true_answer)
 
                 # Calc interesting things
-                true_answer_length = len(true_ans_tokens)
-                pred_answer_length = len(pred_ans_tokens)
+                true_answer_length = len(true_answer)
+                pred_answer_length = len(normalize_answer(pred_answer))
                 if "where" in batch.qn_tokens or "Where" in batch.qn_tokens:
                     question_type = "where"
                 if "when" in batch.qn_tokens or "When" in batch.qn_tokens:
