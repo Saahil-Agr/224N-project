@@ -196,13 +196,16 @@ def main(unused_argv):
             _, _ = qa_model.check_f1_em(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev", num_samples=10, print_to_screen=True)
 
     elif FLAGS.mode == "generate_statistics":
+        import pickle
         with tf.Session(config=config) as sess:
 
             # Load best model
             initialize_model(sess, qa_model, bestmodel_dir, expect_exists=True)
 
             # Show examples with F1/EM scores
-            _ = qa_model.gen_stats(sess, dev_context_path, dev_qn_path, dev_ans_path, "dev")
+            list_of_tuples = qa_model.gen_stats(sess, dev_context_path, dev_qn_path, dev_ans_path)
+            with open(EXPERIMENTS_DIR+'dev_stats.pkl', 'w') as f:  # Python 3: open(..., 'wb')
+                pickle.dump(list_of_tuples, f)
 
     elif FLAGS.mode == "official_eval":
         if FLAGS.json_in_path == "":
