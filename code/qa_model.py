@@ -162,6 +162,7 @@ class QAModel(object):
         c2q,q2c = biAttn_layer.build_graph(question_hiddens,self.qn_mask,context_hiddens,self.context_mask,S)
 
         #################### Self attention
+        b_s = tf.shape(context_hiddens)
         arbit = 100
         W_1 = tf.get_variable("W_1", shape=[2 * self.FLAGS.hidden_size, arbit],
                               initializer=tf.contrib.layers.xavier_initializer())
@@ -170,11 +171,11 @@ class QAModel(object):
                             initializer=tf.contrib.layers.xavier_initializer())
 
         v = tf.reshape(context_hiddens,
-                                    (self.FLAGS.batch_size * self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
+                                    (b_s[0] * self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
         hj = tf.matmul(v, W_1)  # (batch_size,context_length,arbit)
-        hj = tf.reshape(hj,[self.FLAGS.batch_size,self.FLAGS.context_len,arbit])
+        hj = tf.reshape(hj,[b_s[0],self.FLAGS.context_len,arbit])
         hi = tf.matmul(v, W_2) # (batch_size,context_length,arbit)
-        hi = tf.reshape(hi, [self.FLAGS.batch_size, self.FLAGS.context_len, arbit])
+        hi = tf.reshape(hi, [b_s[0], self.FLAGS.context_len, arbit])
         #context_hiddens = tf.reshape(context_hiddens,(self.FLAGS.batch_size, self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
         hj = tf.expand_dims(hj, axis=1) # (batch_size,1, context_length,arbit)
         hi = tf.expand_dims(hi, axis=2) # (batch_size,context_length,1,arbit)
@@ -230,7 +231,6 @@ class QAModel(object):
             #self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
             self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_start,
                                                                                      self.context_mask)
-        print "start_pos", self.probdist_start.get_shape()
         # Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
@@ -274,12 +274,12 @@ class QAModel(object):
             loss_start = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_start, labels=self.ans_span[:, 0]) # loss_start has shape (batch_size)
             self.loss_start = tf.reduce_mean(loss_start) # scalar. avg across batch
             tf.summary.scalar('loss_start', self.loss_start) # log to tensorboard
-            print self.loss_start
+            #print self.loss_start
             # Calculate loss for prediction of end position
             loss_end = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_end, labels=self.ans_span[:, 1])
             self.loss_end = tf.reduce_mean(loss_end)
             tf.summary.scalar('loss_end', self.loss_end)
-            print self.loss_end
+            #print self.loss_end
             # Add the two losses
             self.loss = self.loss_start + self.loss_end
             tf.summary.scalar('loss', self.loss)
@@ -308,7 +308,6 @@ class QAModel(object):
         input_feed[self.qn_mask] = batch.qn_mask
         input_feed[self.ans_span] = batch.ans_span
         input_feed[self.keep_prob] = 1.0 - self.FLAGS.dropout # apply dropout
-
         # output_feed contains the things we want to fetch.
         output_feed = [self.updates, self.summaries, self.loss, self.global_step, self.param_norm, self.gradient_norm]
 
@@ -368,7 +367,7 @@ class QAModel(object):
 
         output_feed = [self.probdist_start, self.probdist_end]
         [probdist_start, probdist_end] = session.run(output_feed, input_feed)
-        print "end dist", probdist_end
+        #print "end dist", probdist_end
         return probdist_start, probdist_end
 
 
@@ -390,7 +389,7 @@ class QAModel(object):
         # Take argmax to get start_pos and end_post, both shape (batch_size)
         start_pos = np.argmax(start_dist, axis=1)
         end_pos = np.argmax(end_dist, axis=1)
-        print "start",start_pos, "end", end_pos
+        #print "start",start_pos, "end", end_pos
         return start_pos, end_pos
 
 
