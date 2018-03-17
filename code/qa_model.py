@@ -169,20 +169,19 @@ class QAModel(object):
         V = tf.get_variable("V", shape=[1,1,1,arbit],
                             initializer=tf.contrib.layers.xavier_initializer())
 
-        context_hiddens = tf.reshape(context_hiddens,
+        v = tf.reshape(context_hiddens,
                                     (self.FLAGS.batch_size * self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
-        hj = tf.matmul(context_hiddens, W_1)  # (batch_size,context_length,arbit)
+        hj = tf.matmul(v, W_1)  # (batch_size,context_length,arbit)
         hj = tf.reshape(hj,[self.FLAGS.batch_size,self.FLAGS.context_len,arbit])
-        hi = tf.matmul(context_hiddens, W_2) # (batch_size,context_length,arbit)
+        hi = tf.matmul(v, W_2) # (batch_size,context_length,arbit)
         hi = tf.reshape(hi, [self.FLAGS.batch_size, self.FLAGS.context_len, arbit])
-        context_hiddens = tf.reshape(context_hiddens,
-                                     (self.FLAGS.batch_size, self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
+        #context_hiddens = tf.reshape(context_hiddens,(self.FLAGS.batch_size, self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
         hj = tf.expand_dims(hj, axis=1) # (batch_size,1, context_length,arbit)
         hi = tf.expand_dims(hi, axis=2) # (batch_size,context_length,1,arbit)
         h = hi+hj # (batch_size,context_length, context_length,arbit)
         h2 = tf.tanh(h)  # (batch_size,context_length, context_length,arbit)
         e = tf.reduce_sum(tf.multiply(h2, V), axis=3)  # (batch_size,context_length, context_length)
-        print e.get_shape()
+
         selfAttention_layer = Self_Attention(self.keep_prob,self.FLAGS.context_len)
         a_self = selfAttention_layer.build_graph(context_hiddens,self.context_mask,e)
         ###############################
@@ -235,19 +234,19 @@ class QAModel(object):
         # Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
-            pos_start = tf.argmax(self.probdist_start,axis=1,output_type=tf.int32) # shape batch_size
+            #pos_start = tf.argmax(self.probdist_start,axis=1,output_type=tf.int32) # shape batch_size
             #for i in range(self.FLAGS.batch_size):
             #    new_context_mask[i,:] = tf.concat([tf.constant(np.zeros((self.FLAGS.batch_size,pos_start[i]))), Q[:,
                                                                                         #pos_start[i]+1:]], axis=1)
-            st = tf.sequence_mask(pos_start,self.FLAGS.context_len)
-            st = tf.cast(st,dtype=tf.int32)
-            st = tf.negative(st)
-            st = st+1
-            new_context_mask = tf.multiply(self.context_mask,st)
-            print "new mask", new_context_mask.get_shape()
+            #st = tf.sequence_mask(pos_start,self.FLAGS.context_len)
+            #st = tf.cast(st,dtype=tf.int32)
+            #st = tf.negative(st)
+            #st = st+1
+            #new_context_mask = tf.multiply(self.context_mask,st)
+            #print "new mask", new_context_mask.get_shape()
             softmax_layer_end = SimpleSoftmaxLayer()
-            #self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
-            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, new_context_mask)# new_context_mask)
+            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
+            #self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, new_context_mask)# new_context_mask)
 
 
     def add_loss(self):
@@ -369,6 +368,7 @@ class QAModel(object):
 
         output_feed = [self.probdist_start, self.probdist_end]
         [probdist_start, probdist_end] = session.run(output_feed, input_feed)
+        print "end dist", probdist_end
         return probdist_start, probdist_end
 
 
@@ -390,7 +390,7 @@ class QAModel(object):
         # Take argmax to get start_pos and end_post, both shape (batch_size)
         start_pos = np.argmax(start_dist, axis=1)
         end_pos = np.argmax(end_dist, axis=1)
-
+        print "start",start_pos, "end", end_pos
         return start_pos, end_pos
 
 

@@ -304,7 +304,6 @@ class Self_Attention(object):
         with vs.variable_scope("self_attention"):
             context_mask = tf.expand_dims(context_mask,axis=1) # shape(batch, 1, context_size)
             _,alpha = masked_softmax(att_vec,context_mask,2) # shape( batch_size, context_len, context_len)
-            print att_vec.get_shape(), "alpha", alpha.get_shape()
             a_self = tf.matmul(alpha, context)  # shape( batch_size, context_len, 2*hidden_size)
             return a_self
 
