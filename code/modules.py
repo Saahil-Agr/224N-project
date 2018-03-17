@@ -198,7 +198,7 @@ class BiDaff(object):
         keys:
         Keys_mask:
         S = Similarity matrix, tensor of dimension N*M (batch_size,num_keys,num_values)
-        Output:
+         Output:
         """
         with vs.variable_scope("BiDaff"):
            #values_t = tf.transpose(values, perm=[0, 2, 1])  # (batch_size, value_vec_size, num_values)
@@ -284,7 +284,7 @@ class BiLSTM(object):
 
 class Self_Attention(object):
     """Self attention layer that computes the context aware representation of context"""
-    def __init__(self, keep_prob,context_vec_size):
+    def __init__(self, keep_prob,context_length):
         """
         Inputs:
           keep_prob: tensor containing a single scalar that is the keep probability (for dropout)
@@ -292,7 +292,7 @@ class Self_Attention(object):
           value_vec_size: size of the value vectors. int
         """
         self.keep_prob = keep_prob
-        self.context_vec_size = context_vec_size
+        self.context_length = context_length
     def build_graph(self,context,context_mask,att_vec):
         """
         Inputs
@@ -302,7 +302,8 @@ class Self_Attention(object):
         :return: a_self : the final self attention vector for context of N*2h
         """
         with vs.variable_scope("self_attention"):
-            _,alpha = masked_softmax(att_vec,context_mask,1) # shape( batch_size, context_len, context_len)
+            context_mask = tf.expand_dims(context_mask,axis=1) # shape(batch, 1, context_size)
+            _,alpha = masked_softmax(att_vec,context_mask,2) # shape( batch_size, context_len, context_len)
             print att_vec.get_shape(), "alpha", alpha.get_shape()
             a_self = tf.matmul(alpha, context)  # shape( batch_size, context_len, 2*hidden_size)
             return a_self
