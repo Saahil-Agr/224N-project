@@ -78,7 +78,10 @@ def sentence_to_char_token_ids(sentence, char2id, word_len, sentence_len):
     :param word2list: dictionary mapping from char to id
     :return: id_list: [[int]] list of character id lists for each word
     """
-    tokens = split_by_whitespace(sentence)  # list of strings
+    if isinstance(sentence,basestring):
+    	tokens = split_by_whitespace(sentence)  # list of strings
+    else:
+	tokens = sentence
     ids_list = []
     #TODO determine more efficient soln
     for w_idx,w in enumerate(tokens):
