@@ -23,6 +23,7 @@ import os
 import sys
 
 import numpy as np
+np.set_printoptions(threshold=np.nan)
 import tensorflow as tf
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import embedding_ops
@@ -230,16 +231,28 @@ class QAModel(object):
         # Use softmax layer to compute probability distribution for start location
         # Note this produces self.logits_start and self.probdist_start, both of which have shape (batch_size, context_len)
         with vs.variable_scope("StartDist"):
+	    #st = tf.sequence_mask(np.ones(self.FLAGS.batch_size,dtype = int),self.FLAGS.context_len)
+	    #st = tf.cast(st,dtype=tf.int32)
+            #st = tf.negative(st)
+	    #st = st+1
+            #st = tf.multiply(self.context_mask,st)
             softmax_layer_start = SimpleSoftmaxLayer()
             #self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
             self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_start,
                                                                                      self.context_mask)
+	    start_pos = tf.argmax(self.probdist_start, axis =1)-1
         # Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
+	    st = tf.sequence_mask(start_pos,self.FLAGS.context_len)
+	    #st = tf.sequence_mask(np.ones(self.FLAGS.batch_size,dtype = int),self.FLAGS.context_len)
+	    st = tf.cast(st,dtype=tf.int32)
+            st = tf.negative(st)
+	    st = st+1
+            self.new_context_mask = tf.multiply(self.context_mask,st)
             softmax_layer_end = SimpleSoftmaxLayer()
             #self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
-            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, self.context_mask)
+            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, self.new_context_mask)
 
 
     def add_loss(self):
@@ -274,7 +287,8 @@ class QAModel(object):
             tf.summary.scalar('loss_end', self.loss_end)
 
             # Add the two losses
-            self.loss = self.loss_start + self.loss_end
+	    self.loss = tf.cond(self.loss_end > 20,lambda: tf.add(self.loss_start,self.loss_start),lambda:tf.add(self.loss_start,self.loss_end)) 
+            #self.loss = self.loss_start + self.loss_end
             tf.summary.scalar('loss', self.loss)
 
 
@@ -306,11 +320,12 @@ class QAModel(object):
         input_feed[self.keep_prob] = 1.0 - self.FLAGS.dropout # apply dropout
 
         # output_feed contains the things we want to fetch.
-        output_feed = [self.updates, self.summaries, self.loss, self.global_step, self.param_norm, self.gradient_norm]
+        output_feed = [self.updates, self.summaries, self.loss, self.global_step, self.param_norm, self.gradient_norm,self.probdist_start,self.ans_span]
 
         # Run the model
-        [_, summaries, loss, global_step, param_norm, gradient_norm] = session.run(output_feed, input_feed)
+        [_, summaries, loss, global_step, param_norm, gradient_norm,start,ans_span] = session.run(output_feed, input_feed)
 
+	#print(np.any(np.argmax(start,axis=1)>ans_span[:,1]))
         # All summaries in the graph are added to Tensorboard
         summary_writer.add_summary(summaries, global_step)
 

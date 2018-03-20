@@ -41,14 +41,14 @@ EXPERIMENTS_DIR = os.path.join(MAIN_DIR, "experiments") # relative path of exper
 tf.app.flags.DEFINE_integer("gpu", 0, "Which GPU to use, if you have multiple.")
 tf.app.flags.DEFINE_string("mode", "train", "Available modes: train / show_examples / official_eval")
 tf.app.flags.DEFINE_string("experiment_name", "", "Unique name for your experiment. This will create a directory by this name in the experiments/ directory, which will hold all data related to this experiment")
-tf.app.flags.DEFINE_integer("num_epochs", 1, "Number of epochs to train. 0 means train indefinitely")
+tf.app.flags.DEFINE_integer("num_epochs", 0, "Number of epochs to train. 0 means train indefinitely")
 
 # Hyperparameters
 tf.app.flags.DEFINE_float("learning_rate", 0.5, "Learning rate.")
 tf.app.flags.DEFINE_float("lr_decay", 0.999, "Learning rate Decay.")
 tf.app.flags.DEFINE_float("max_gradient_norm", 10.0, "Clip gradients to this norm.")
 tf.app.flags.DEFINE_float("dropout", 0.2, "Fraction of units randomly dropped on non-recurrent connections.")
-tf.app.flags.DEFINE_integer("batch_size", 60, "Batch size to use")
+tf.app.flags.DEFINE_integer("batch_size", 50, "Batch size to use")
 tf.app.flags.DEFINE_integer("hidden_size", 200, "Size of the hidden states")
 tf.app.flags.DEFINE_integer("context_len", 400, "The maximum context length of your model")
 tf.app.flags.DEFINE_integer("question_len", 30, "The maximum question length of your model")
@@ -58,7 +58,7 @@ tf.app.flags.DEFINE_bool("char_embedding",True, "Flag to do Character embedding 
 tf.app.flags.DEFINE_integer("char_window_size",5, "Width of conv filter for char embedding")
 tf.app.flags.DEFINE_integer("char_filter_num",100, "Numer of conv filters")
 tf.app.flags.DEFINE_integer("word_len",15, "The maximum number of characters for any word in corpous")
-tf.app.flags.DEFINE_integer("char_embedding_size",50, "The dimension of character embeddings")
+tf.app.flags.DEFINE_integer("char_embedding_size",20, "The dimension of character embeddings")
 # TODO update to support CNN embedding parameters
 
 # How often to print, save, eval
