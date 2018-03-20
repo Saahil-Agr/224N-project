@@ -564,7 +564,7 @@ class QAModel(object):
                 # You need to use the original no-UNK version when measuring F1/EM
                 pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start: pred_ans_end + 1]
                 pred_answer = " ".join(pred_ans_tokens)
-                if pred_ans_start > batch.ans_span[1] or pred_ans_end < batch.ans_span[0]:
+                if pred_ans_start > batch.ans_span[ex_idx][1] or pred_ans_end < batch.ans_span[ex_idx][0]:
                     totally_wrong +=1
                 # Get true answer (no UNKs)
                 true_answer = " ".join(true_ans_tokens)
