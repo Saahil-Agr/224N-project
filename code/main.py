@@ -132,8 +132,8 @@ def main(unused_argv):
 
     # Define path for character vecs
     if FLAGS.char_embedding:
-        FLAGS.char_path = FLAGS.char_path or os.path.join(DEFAULT_DATA_DIR,
-                                                        "char_vocabulary.txt")
+        FLAGS.char_path = FLAGS.char_path or os.path.join(MAIN_DIR,"code/char_vocabulary.txt")
+                                                       #"char_vocabulary.txt")
 
     # Load embedding matrix and vocab mappings
     emb_matrix, word2id, id2word = get_glove(FLAGS.glove_path, FLAGS.embedding_size)
