@@ -516,19 +516,19 @@ class QAModel(object):
                 # Calc interesting things
                 true_answer_length = len(true_answer)
                 pred_answer_length = len(normalize_answer(pred_answer))
-                if "where" in batch.qn_tokens or "Where" in batch.qn_tokens:
+                if "where" in batch.qn_tokens or "Where" in batch.qn_tokens[ex_idx]:
                     question_type = "where"
-                elif "when" in batch.qn_tokens or "When" in batch.qn_tokens:
+                elif "when" in batch.qn_tokens or "When" in batch.qn_tokens[ex_idx]:
                     question_type = "when"
-                elif "how" in batch.qn_tokens or "how" in batch.qn_tokens:
+                elif "how" in batch.qn_tokens or "how" in batch.qn_tokens[ex_idx]:
                     question_type = "how"
-                elif "why" in batch.qn_tokens or "Why" in batch.qn_tokens:
+                elif "why" in batch.qn_tokens or "Why" in batch.qn_tokens[ex_idx]:
                     question_type = "why"
-                elif "what" in batch.qn_tokens or "What" in batch.qn_tokens:
+                elif "what" in batch.qn_tokens or "What" in batch.qn_tokens[ex_idx]:
                     question_type = "what"
-                elif "who" in batch.qn_tokens or "Who" in batch.qn_tokens:
+                elif "who" in batch.qn_tokens or "Who" in batch.qn_tokens[ex_idx]:
                     question_type = "who"
-                elif "Do" in batch.qn_tokens or "do" in batch.qn_tokens:
+                elif "Do" in batch.qn_tokens or "do" in batch.qn_tokens[ex_idx]:
                     question_type = "do"
                 else:
                     question_type = "other"
