@@ -27,7 +27,7 @@ import tensorflow as tf
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import embedding_ops
 
-from evaluate import exact_match_score, f1_score,, normalize_answer
+from evaluate import exact_match_score, f1_score, normalize_answer
 from data_batcher import get_batch_generator
 from pretty_print import print_example
 from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff, BiLSTM
@@ -518,21 +518,25 @@ class QAModel(object):
                 pred_answer_length = len(normalize_answer(pred_answer))
                 if "where" in batch.qn_tokens or "Where" in batch.qn_tokens:
                     question_type = "where"
-                if "when" in batch.qn_tokens or "When" in batch.qn_tokens:
+                elif "when" in batch.qn_tokens or "When" in batch.qn_tokens:
                     question_type = "when"
-                if "how" in batch.qn_tokens or "how" in batch.qn_tokens:
+                elif "how" in batch.qn_tokens or "how" in batch.qn_tokens:
                     question_type = "how"
-                if "why" in batch.qn_tokens or "Why" in batch.qn_tokens:
+                elif "why" in batch.qn_tokens or "Why" in batch.qn_tokens:
                     question_type = "why"
-                if "what" in batch.qn_tokens or "What" in batch.qn_tokens:
+                elif "what" in batch.qn_tokens or "What" in batch.qn_tokens:
                     question_type = "what"
+                elif "who" in batch.qn_tokens or "Who" in batch.qn_tokens:
+                    question_type = "who"
+                elif "Do" in batch.qn_tokens or "do" in batch.qn_tokens:
+                    question_type = "do"
                 else:
                     question_type = "other"
                 list_of_data_tuples.append((f1, em, question_type, true_answer_length, pred_answer_length))
             count += 1
             if count % 20 == 0:
                 print("Batch #: " + str(count))
-        return list_of_data_tuple
+        return list_of_data_tuples
 
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
