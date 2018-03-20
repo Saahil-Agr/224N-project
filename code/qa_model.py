@@ -547,7 +547,6 @@ class QAModel(object):
           session: TensorFlow session
           {train/dev}_{qn/context/ans}_path: paths to {train/dev}.{context/question/answer} data files
         """
-
         # Print number of model parameters
         tic = time.time()
         params = tf.trainable_variables()
