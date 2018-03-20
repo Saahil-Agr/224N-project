@@ -544,7 +544,7 @@ class QAModel(object):
         """
         list_of_data_tuples=[]
         count =0
-
+        totally_wrong = 0
         # For every batch
         for batch in get_batch_generator(self.word2id, context_path, qn_path, ans_path,
                                          self.FLAGS.batch_size, context_len=self.FLAGS.context_len,
@@ -564,7 +564,8 @@ class QAModel(object):
                 # You need to use the original no-UNK version when measuring F1/EM
                 pred_ans_tokens = batch.context_tokens[ex_idx][pred_ans_start: pred_ans_end + 1]
                 pred_answer = " ".join(pred_ans_tokens)
-
+                if pred_ans_start > batch.ans_span[1] or pred_ans_end < batch.ans_span[0]:
+                    totally_wrong +=1
                 # Get true answer (no UNKs)
                 true_answer = " ".join(true_ans_tokens)
 
@@ -593,7 +594,7 @@ class QAModel(object):
                     question_type = "which"
                 else:
                     question_type = "other"
-                list_of_data_tuples.append((f1,em,question_type,true_answer_length,pred_answer_length))
+                list_of_data_tuples.append((f1,em,question_type,true_answer_length,pred_answer_length,totally_wrong))
             count += 1
             if count%20==0:
                 print("Batch #: "+str(count))
