@@ -162,7 +162,7 @@ class QAModel(object):
         c2q,q2c = biAttn_layer.build_graph(question_hiddens,self.qn_mask,context_hiddens,self.context_mask,S)
 
         #################### Self attention
-        b_s = tf.shape(context_hiddens)
+        #b_s = tf.shape(context_hiddens)
         arbit = 100
         W_1 = tf.get_variable("W_1", shape=[2 * self.FLAGS.hidden_size, arbit],
                               initializer=tf.contrib.layers.xavier_initializer())
@@ -170,17 +170,18 @@ class QAModel(object):
         V = tf.get_variable("V", shape=[1,1,1,arbit],
                             initializer=tf.contrib.layers.xavier_initializer())
 
-        v = tf.reshape(context_hiddens,
-                                    (b_s[0] * self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
-        hj = tf.matmul(v, W_1)  # (batch_size,context_length,arbit)
-        hj = tf.reshape(hj,[b_s[0],self.FLAGS.context_len,arbit])
-        hi = tf.matmul(v, W_2) # (batch_size,context_length,arbit)
-        hi = tf.reshape(hi, [b_s[0], self.FLAGS.context_len, arbit])
+        #v = tf.reshape(context_hiddens,
+                                    #(b_s[0] * self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
+                                    #[-1, self.FLAGS.hidden_size * 2])
+        hj = tf.matmul(tf.reshape(context_hiddens,[-1,self.FLAGS.hidden_size*2]), W_1)  # (batch_size,context_length,arbit)
+        hj = tf.reshape(hj,[-1,self.FLAGS.context_len,arbit])
+        hi = tf.matmul(tf.reshape(context_hiddens,[-1,self.FLAGS.hidden_size*2]), W_2) # (batch_size,context_length,arbit)
+        hi = tf.reshape(hi, [-1, self.FLAGS.context_len, arbit])
         #context_hiddens = tf.reshape(context_hiddens,(self.FLAGS.batch_size, self.FLAGS.context_len, self.FLAGS.hidden_size * 2))
         hj = tf.expand_dims(hj, axis=1) # (batch_size,1, context_length,arbit)
         hi = tf.expand_dims(hi, axis=2) # (batch_size,context_length,1,arbit)
-        h = hi+hj # (batch_size,context_length, context_length,arbit)
-        h2 = tf.tanh(h)  # (batch_size,context_length, context_length,arbit)
+        h2 = hi+hj # (batch_size,context_length, context_length,arbit)
+        h2 = tf.tanh(h2)  # (batch_size,context_length, context_length,arbit)
         e = tf.reduce_sum(tf.multiply(h2, V), axis=3)  # (batch_size,context_length, context_length)
 
         selfAttention_layer = Self_Attention(self.keep_prob,self.FLAGS.context_len)
