@@ -74,9 +74,9 @@ class QAModel(object):
         # Define optimizer and updates
         # (updates is what you need to fetch in session.run to do a gradient update)
         self.global_step = tf.Variable(0, name="global_step", trainable=False)
-        opt = tf.train.AdadeltaOptimizer(learning_rate = FLAGS.learning_rate, rho = FLAGS.lr_decay)
+        #opt = tf.train.AdadeltaOptimizer(learning_rate = FLAGS.learning_rate, rho = FLAGS.lr_decay)
         #Baseline optimizer
-        #opt = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate) # you can try other optimizers
+        opt = tf.train.AdamOptimizer(learning_rate=FLAGS.learning_rate) # you can try other optimizers
         self.updates = opt.apply_gradients(zip(clipped_gradients, params), global_step=self.global_step)
 
         # Define savers (for checkpointing) and summaries (for tensorboard)
@@ -234,12 +234,18 @@ class QAModel(object):
             #self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_final, self.context_mask)
             self.logits_start, self.probdist_start = softmax_layer_start.build_graph(blended_reps_start,
                                                                                      self.context_mask)
-        # Use softmax layer to compute probability distribution for end location
+        pos_start = tf.argmax(self.probdist_start,axis=1,output_type=tf.int32)-1 
+	# Use softmax layer to compute probability distribution for end location
         # Note this produces self.logits_end and self.probdist_end, both of which have shape (batch_size, context_len)
         with vs.variable_scope("EndDist"):
+	    st = tf.sequence_mask(pos_start,self.FLAGS.context_len)
+	    st = tf.cast(st,dtype=tf.int32)
+	    st = tf.negative(st)
+	    st = st +1 
+            st = tf.multiply(st,self.context_mask)
             softmax_layer_end = SimpleSoftmaxLayer()
             #self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_final, self.context_mask)
-            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, self.context_mask)
+            self.logits_end, self.probdist_end = softmax_layer_end.build_graph(blended_reps_end, st)
 
 
     def add_loss(self):
@@ -270,6 +276,9 @@ class QAModel(object):
 
             # Calculate loss for prediction of end position
             loss_end = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=self.logits_end, labels=self.ans_span[:, 1])
+            a = tf.greater(loss_end,20)
+	    a = tf.cast(a,dtype=tf.float32)
+	    loss_end = tf.multiply(loss_start,a)+tf.multiply((tf.negative(a)+1.0),loss_end) 
             self.loss_end = tf.reduce_mean(loss_end)
             tf.summary.scalar('loss_end', self.loss_end)
 
