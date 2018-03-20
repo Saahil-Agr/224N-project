@@ -27,7 +27,7 @@ import tensorflow as tf
 from tensorflow.python.ops import variable_scope as vs
 from tensorflow.python.ops import embedding_ops
 
-from evaluate import exact_match_score, f1_score,, normalize_answer
+from evaluate import exact_match_score, f1_score, normalize_answer
 from data_batcher import get_batch_generator
 from pretty_print import print_example
 from modules import RNNEncoder, SimpleSoftmaxLayer, BasicAttn, BiDaff, BiLSTM
@@ -532,7 +532,7 @@ class QAModel(object):
             count += 1
             if count % 20 == 0:
                 print("Batch #: " + str(count))
-        return list_of_data_tuple
+        return list_of_data_tuples
 
 
     def train(self, session, train_context_path, train_qn_path, train_ans_path, dev_qn_path, dev_context_path, dev_ans_path):
@@ -543,7 +543,6 @@ class QAModel(object):
           session: TensorFlow session
           {train/dev}_{qn/context/ans}_path: paths to {train/dev}.{context/question/answer} data files
         """
-
         # Print number of model parameters
         tic = time.time()
         params = tf.trainable_variables()
